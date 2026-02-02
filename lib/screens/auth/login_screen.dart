@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/theme/da_colors.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'dart:math';
 
 class LoginScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   late AnimationController _controller;
   late Animation<double> _logoScaleAnim;
@@ -25,6 +27,8 @@ class _LoginScreenState extends State<LoginScreen>
   late Animation<Offset> _passwordSlideAnim;
   late Animation<Offset> _buttonSlideAnim;
   late Animation<double> _bottomOpacityAnim;
+
+  bool _isLoading = false;
 
   static const double _refWidth = 393.0;
   static const double _refHeight = 852.0;
@@ -108,6 +112,56 @@ class _LoginScreenState extends State<LoginScreen>
     final scaleH =
         (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
     return min(scaleW, scaleH);
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showErrorDialog('Please enter your email and password');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.loginWithEmailPassword(
+        email: email,
+        password: password,
+      );
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.home,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog(e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Login Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -287,12 +341,7 @@ class _LoginScreenState extends State<LoginScreen>
                             width: double.infinity,
                             height: buttonHeight,
                             child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  AppRoutes.home,
-                                );
-                              },
+                              onPressed: _isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: DAColors.orange,
                                 foregroundColor: DAColors.white,
@@ -306,15 +355,24 @@ class _LoginScreenState extends State<LoginScreen>
                                   horizontal: 20 * scale,
                                 ),
                               ),
-                              child: Text(
-                                'Login',
-                                style: GoogleFonts.poppins(
-                                  fontSize: buttonFontSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: DAColors.white,
-                                  height: 1.2,
-                                ),
-                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: DAColors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Login',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: buttonFontSize,
+                                        fontWeight: FontWeight.bold,
+                                        color: DAColors.white,
+                                        height: 1.2,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -342,13 +400,12 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     CupertinoButton(
                                       padding: EdgeInsets.zero,
-                                      minSize: 0,
                                       onPressed: () {
                                         Navigator.pushNamed(
                                           context,
                                           AppRoutes.register,
                                         );
-                                      },
+                                      }, minimumSize: Size(0, 0),
                                       child: Text(
                                         'Sign Up',
                                         style: GoogleFonts.poppins(
@@ -363,13 +420,12 @@ class _LoginScreenState extends State<LoginScreen>
                                 SizedBox(height: spacingAfterButton * 0.5),
                                 CupertinoButton(
                                   padding: EdgeInsets.zero,
-                                  minSize: 0,
                                   onPressed: () {
                                     Navigator.pushReplacementNamed(
                                       context,
                                       AppRoutes.accountUnderReview,
                                     );
-                                  },
+                                  }, minimumSize: Size(0, 0),
                                   child: Text(
                                     '[TEST] Go to Under Review',
                                     style: GoogleFonts.poppins(

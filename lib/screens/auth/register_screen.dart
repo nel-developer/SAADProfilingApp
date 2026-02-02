@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/theme/da_colors.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'dart:math';
 
 class RegisterScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   late AnimationController _controller;
   late Animation<double> _logoScaleAnim;
@@ -31,6 +33,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   late Animation<Offset> _passwordSlideAnim;
   late Animation<Offset> _buttonSlideAnim;
   late Animation<double> _bottomOpacityAnim;
+
+  bool _isLoading = false;
 
   static const double _refWidth = 393.0;
   static const double _refHeight = 852.0;
@@ -140,6 +144,81 @@ class _RegisterScreenState extends State<RegisterScreen>
     final scaleH =
         (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
     return min(scaleW, scaleH);
+  }
+
+  Future<void> _handleRegister() async {
+    // Prevent multiple submissions
+    if (_isLoading) return;
+
+    final firstName = _firstNameController.text.trim();
+    final middleName = _middleNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (firstName.isEmpty ||
+        lastName.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty) {
+      _showErrorDialog('Please fill in all required fields');
+      return;
+    }
+
+    // Validate email format
+    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(email)) {
+      _showErrorDialog('Please enter a valid email address');
+      return;
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      _showErrorDialog('Password must be at least 6 characters');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.registerWithEmailPassword(
+        email: email,
+        password: password,
+        firstName: firstName,
+        middleName: middleName,
+        lastName: lastName,
+      );
+
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.accountUnderReview,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog(e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Registration Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTextField({
@@ -334,12 +413,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             width: double.infinity,
                             height: buttonHeight,
                             child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  AppRoutes.accountUnderReview,
-                                );
-                              },
+                              onPressed: _isLoading ? null : _handleRegister,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: DAColors.orange,
                                 foregroundColor: DAColors.white,
@@ -353,15 +427,24 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   horizontal: 20 * scale,
                                 ),
                               ),
-                              child: Text(
-                                'Register',
-                                style: GoogleFonts.poppins(
-                                  fontSize: buttonFontSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: DAColors.white,
-                                  height: 1.2,
-                                ),
-                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: DAColors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Register',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: buttonFontSize,
+                                        fontWeight: FontWeight.bold,
+                                        color: DAColors.white,
+                                        height: 1.2,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -387,10 +470,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                                 CupertinoButton(
                                   padding: EdgeInsets.zero,
-                                  minSize: 0,
                                   onPressed: () {
                                     Navigator.pop(context);
-                                  },
+                                  }, minimumSize: Size(0, 0),
                                   child: Text(
                                     'Login',
                                     style: GoogleFonts.poppins(
