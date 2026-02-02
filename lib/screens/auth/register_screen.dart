@@ -200,7 +200,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     final spacingBeforeButton = _refHeight * 0.03 * scale;
     final buttonHeight = 50.0 * scale;
     final buttonRadius = 25.0 * scale;
-    final buttonFontSize = _refWidth * 0.05 * scale;
+    final buttonFontSize = 18.0 * scale; // Fixed: Based on scale, not absolute percentage
     final bottomFontSize = _refWidth * 0.035 * scale;
     final spacingAfterButton = _refHeight * 0.02 * scale;
 
@@ -224,173 +224,191 @@ class _RegisterScreenState extends State<RegisterScreen>
 
           /// CONTENT
           SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: logoTopPad),
-
-                /// LOGO
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _logoOpacityAnim.value,
-                      child: Transform.scale(
-                        scale: _logoScaleAnim.value,
-                        child: Image.asset(
-                          'assets/images/da_logo.png',
-                          width: logoWidth,
-                        ),
-                      ),
-                    );
-                  },
+            child: SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom,
                 ),
-
-                SizedBox(height: spacingAfterLogo),
-
-                /// TITLE
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _titleOpacityAnim.value,
-                      child: Text(
-                        'Register',
-                        style: GoogleFonts.poppins(
-                          fontSize: titleFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: DAColors.white,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
-                SizedBox(height: spacingAfterTitle),
-
-                /// FORM FIELDS
-                Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                child: IntrinsicHeight(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _buildTextField(
-                        controller: _firstNameController,
-                        hintText: 'First Name',
-                        slideAnim: _firstNameSlideAnim,
-                        scale: scale,
+                      SizedBox(height: logoTopPad),
+
+                      /// LOGO
+                      AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _logoOpacityAnim.value,
+                            child: Transform.scale(
+                              scale: _logoScaleAnim.value,
+                              child: Image.asset(
+                                'assets/images/da_logo.png',
+                                width: logoWidth,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      SizedBox(height: spacingBetweenFields),
-                      _buildTextField(
-                        controller: _middleNameController,
-                        hintText: 'Middle Name',
-                        slideAnim: _middleNameSlideAnim,
-                        scale: scale,
+
+                      SizedBox(height: spacingAfterLogo),
+
+                      /// TITLE
+                      AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _titleOpacityAnim.value,
+                            child: Text(
+                              'Register',
+                              style: GoogleFonts.poppins(
+                                fontSize: titleFontSize,
+                                fontWeight: FontWeight.bold,
+                                color: DAColors.white,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      SizedBox(height: spacingBetweenFields),
-                      _buildTextField(
-                        controller: _lastNameController,
-                        hintText: 'Last Name',
-                        slideAnim: _lastNameSlideAnim,
-                        scale: scale,
+
+                      SizedBox(height: spacingAfterTitle),
+
+                      /// FORM FIELDS
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: fieldHorizontalPad),
+                        child: Column(
+                          children: [
+                            _buildTextField(
+                              controller: _firstNameController,
+                              hintText: 'First Name',
+                              slideAnim: _firstNameSlideAnim,
+                              scale: scale,
+                            ),
+                            SizedBox(height: spacingBetweenFields),
+                            _buildTextField(
+                              controller: _middleNameController,
+                              hintText: 'Middle Name',
+                              slideAnim: _middleNameSlideAnim,
+                              scale: scale,
+                            ),
+                            SizedBox(height: spacingBetweenFields),
+                            _buildTextField(
+                              controller: _lastNameController,
+                              hintText: 'Last Name',
+                              slideAnim: _lastNameSlideAnim,
+                              scale: scale,
+                            ),
+                            SizedBox(height: spacingBetweenFields),
+                            _buildTextField(
+                              controller: _emailController,
+                              hintText: 'Email',
+                              slideAnim: _emailSlideAnim,
+                              scale: scale,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            SizedBox(height: spacingBetweenFields),
+                            _buildTextField(
+                              controller: _passwordController,
+                              hintText: 'Password',
+                              slideAnim: _passwordSlideAnim,
+                              scale: scale,
+                              obscureText: true,
+                            ),
+                          ],
+                        ),
                       ),
-                      SizedBox(height: spacingBetweenFields),
-                      _buildTextField(
-                        controller: _emailController,
-                        hintText: 'Email',
-                        slideAnim: _emailSlideAnim,
-                        scale: scale,
-                        keyboardType: TextInputType.emailAddress,
+
+                      SizedBox(height: spacingBeforeButton),
+
+                      /// REGISTER BUTTON
+                      SlideTransition(
+                        position: _buttonSlideAnim,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: fieldHorizontalPad),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: buttonHeight,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  AppRoutes.accountUnderReview,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: DAColors.orange,
+                                foregroundColor: DAColors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(buttonRadius),
+                                ),
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: buttonHeight * 0.25,
+                                  horizontal: 20 * scale,
+                                ),
+                              ),
+                              child: Text(
+                                'Register',
+                                style: GoogleFonts.poppins(
+                                  fontSize: buttonFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: DAColors.white,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                      SizedBox(height: spacingBetweenFields),
-                      _buildTextField(
-                        controller: _passwordController,
-                        hintText: 'Password',
-                        slideAnim: _passwordSlideAnim,
-                        scale: scale,
-                        obscureText: true,
+
+                      SizedBox(height: spacingAfterButton),
+
+                      /// BOTTOM TEXT
+                      AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _bottomOpacityAnim.value,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Already have an account? ',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: bottomFontSize,
+                                    color: DAColors.white,
+                                  ),
+                                ),
+                                CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  minSize: 0,
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: Text(
+                                    'Login',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: bottomFontSize,
+                                      color: DAColors.orange,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
-
-                SizedBox(height: spacingBeforeButton),
-
-                /// REGISTER BUTTON
-                SlideTransition(
-                  position: _buttonSlideAnim,
-                  child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: buttonHeight,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushReplacementNamed(
-                            context,
-                            AppRoutes.accountUnderReview,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: DAColors.orange,
-                          foregroundColor: DAColors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(buttonRadius),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: Text(
-                          'Register',
-                          style: GoogleFonts.poppins(
-                            fontSize: buttonFontSize,
-                            fontWeight: FontWeight.bold,
-                            color: DAColors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: spacingAfterButton),
-
-                /// BOTTOM TEXT
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _bottomOpacityAnim.value,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Already have an account? ',
-                            style: GoogleFonts.poppins(
-                              fontSize: bottomFontSize,
-                              color: DAColors.white,
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            child: Text(
-                              'Sign Up',
-                              style: GoogleFonts.poppins(
-                                fontSize: bottomFontSize,
-                                color: DAColors.orange,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         ],
