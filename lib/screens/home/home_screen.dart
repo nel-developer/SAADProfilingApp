@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _tile4Anim;
   late Animation<double> _leafLeftAnim;
   late Animation<double> _leafRightAnim;
-  
+
   final FirebaseAuthService _authService = FirebaseAuthService();
   String? _userRole;
 
@@ -111,7 +111,8 @@ class _HomeScreenState extends State<HomeScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Admin Only'),
-        content: const Text('This feature is only available to administrators.'),
+        content:
+            const Text('This feature is only available to administrators.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -134,66 +135,34 @@ class _HomeScreenState extends State<HomeScreen>
     final width = size.width;
     final height = size.height;
 
-    // Responsive breakpoints
-    final isTablet = width > 600;
-    final isLargeTablet = width > 900;
+    // ── HEADER ──────────────────────────────────────────
+    final headerHeight  = (height * 0.22).clamp(120.0, 180.0);
+    final welcomeFont   = (width * 0.055).clamp(16.0, 28.0);
+    final avatarRadius  = (width * 0.07).clamp(20.0, 38.0);
+    final headerPadH    = (width * 0.06).clamp(16.0, 36.0);
+    final headerPadV    = (height * 0.02).clamp(10.0, 24.0);
 
-    // HEADER HEIGHT
-    final headerHeight = height * (isLargeTablet ? 0.18 : isTablet ? 0.22 : 0.28);
-    
-    // TEXT SIZE
-    final welcomeFontSize = isLargeTablet 
-        ? 48.0
-        : isTablet 
-            ? 38.0
-            : width * 0.065;
-    
-    // AVATAR SIZE
-    final avatarRadius = isLargeTablet
-        ? 55.0
-        : isTablet
-            ? 45.0
-            : width * 0.085;
-
-    // TILES SIZING
-    final tileGridPadding = isLargeTablet
-        ? 60.0
-        : isTablet
-            ? width * 0.08
-            : width * 0.06;
-    
-    final tileSpacing = isLargeTablet
-        ? 40.0
-        : isTablet
-            ? width * 0.05
-            : width * 0.04;
-
-    // HEADER PADDING
-    final headerHorizontalPadding = isLargeTablet
-        ? 80.0
-        : width * 0.06;
-    
-    final headerVerticalPadding = isLargeTablet
-        ? 30.0
-        : height * 0.025;
+    // ── TILES ───────────────────────────────────────────
+    // Tile size = ~38% of screen width, hard capped 100–150
+    // This keeps tiles the same visual weight on 360 phones AND 540+ screens
+    final tileSize = (width * 0.38).clamp(100.0, 150.0);
+    final gap      = (width * 0.035).clamp(10.0, 18.0);
+    final gridPad  = (width * 0.05).clamp(14.0, 28.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFE8E8E8),
       body: Column(
         children: [
-          /// GREEN HEADER WITH CONTENT
+          // ── GREEN HEADER ──────────────────────────────
           SizedBox(
             height: headerHeight,
             child: Stack(
               children: [
-                /// REUSABLE GREEN HEADER BACKGROUND WITH LEAFS
                 GreenHeaderSection(
                   leafLeftAnimation: _leafLeftAnim,
                   leafRightAnimation: _leafRightAnim,
                   customHeight: headerHeight,
                 ),
-
-                /// HEADER CONTENT (Text + Avatar)
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
@@ -205,8 +174,8 @@ class _HomeScreenState extends State<HomeScreen>
                           height: headerHeight,
                           width: double.infinity,
                           padding: EdgeInsets.symmetric(
-                            horizontal: headerHorizontalPadding,
-                            vertical: headerVerticalPadding,
+                            horizontal: headerPadH,
+                            vertical: headerPadV,
                           ),
                           child: SafeArea(
                             bottom: false,
@@ -214,7 +183,6 @@ class _HomeScreenState extends State<HomeScreen>
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                /// WELCOME TEXT
                                 Flexible(
                                   flex: 3,
                                   child: Text.rich(
@@ -223,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         TextSpan(
                                           text: 'Welcome,\n',
                                           style: GoogleFonts.poppins(
-                                            fontSize: welcomeFontSize,
+                                            fontSize: welcomeFont,
                                             fontWeight: FontWeight.w700,
                                             color: Colors.white,
                                             height: 1.2,
@@ -233,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         TextSpan(
                                           text: 'Juan!',
                                           style: GoogleFonts.poppins(
-                                            fontSize: welcomeFontSize,
+                                            fontSize: welcomeFont,
                                             fontWeight: FontWeight.w700,
                                             color: Colors.white,
                                             height: 1.2,
@@ -246,10 +214,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-
-                                SizedBox(width: width * 0.04),
-
-                                /// AVATAR
+                                SizedBox(width: 12),
                                 CircleAvatar(
                                   radius: avatarRadius,
                                   backgroundColor: Colors.white,
@@ -271,91 +236,75 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
 
-          /// TILES GRID SECTION
+          // ── TILE GRID ─────────────────────────────────
           Expanded(
             child: Padding(
-              padding: EdgeInsets.all(tileGridPadding),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final availableWidth = constraints.maxWidth;
-                  final availableHeight = constraints.maxHeight;
-
-                  // Calculate tile size
-                  final maxTileWidth = (availableWidth - tileSpacing) / 2;
-                  final maxTileHeight = (availableHeight - tileSpacing) / 2;
-
-                  final tileSize = (maxTileWidth < maxTileHeight
-                          ? maxTileWidth
-                          : maxTileHeight)
-                      .clamp(100.0, 250.0);
-
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+              padding: EdgeInsets.all(gridPad),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    /// ROW 1
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        /// ROW 1: Dashboard & Profiling
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: tileSize,
-                              height: tileSize,
-                              child: HomeTile(
-                                label: 'Dashboard',
-                                icon: Icons.grid_view_outlined,
-                                route: AppRoutes.dashboard,
-                                animation: _tile1Anim,
-                              ),
-                            ),
-                            SizedBox(width: tileSpacing),
-                            SizedBox(
-                              width: tileSize,
-                              height: tileSize,
-                              child: HomeTile(
-                                label: 'Profiling',
-                                icon: Icons.person_outline,
-                                route: AppRoutes.profiling, // ← FIXED: may route na
-                                animation: _tile2Anim,
-                              ),
-                            ),
-                          ],
+                        SizedBox(
+                          width: tileSize,
+                          height: tileSize,
+                          child: HomeTile(
+                            label: 'Dashboard',
+                            icon: Icons.grid_view_outlined,
+                            route: AppRoutes.dashboard,
+                            animation: _tile1Anim,
+                          ),
                         ),
-                        SizedBox(height: tileSpacing),
-
-                        /// ROW 2: Accounts & Settings
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: tileSize,
-                              height: tileSize,
-                              child: HomeTile(
-                                label: 'Accounts',
-                                icon: Icons.people_outline,
-                                route: AppRoutes.accounts,
-                                animation: _tile3Anim,
-                                isEnabled: _userRole?.toLowerCase() == 'admin',
-                                onDisabledTap: _showLockedAlert,
-                              ),
-                            ),
-                            SizedBox(width: tileSpacing),
-                            SizedBox(
-                              width: tileSize,
-                              height: tileSize,
-                              child: HomeTile(
-                                label: 'Settings',
-                                icon: Icons.settings_outlined,
-                                route: AppRoutes.settings,
-                                animation: _tile4Anim,
-                              ),
-                            ),
-                          ],
+                        SizedBox(width: gap),
+                        SizedBox(
+                          width: tileSize,
+                          height: tileSize,
+                          child: HomeTile(
+                            label: 'Profiling',
+                            icon: Icons.person_outline,
+                            route: AppRoutes.profiling,
+                            animation: _tile2Anim,
+                          ),
                         ),
                       ],
                     ),
-                  );
-                },
+                    SizedBox(height: gap),
+
+                    /// ROW 2
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: tileSize,
+                          height: tileSize,
+                          child: HomeTile(
+                            label: 'Accounts',
+                            icon: Icons.people_outline,
+                            route: AppRoutes.accounts,
+                            animation: _tile3Anim,
+                            isEnabled: _userRole?.toLowerCase() == 'admin',
+                            onDisabledTap: _showLockedAlert,
+                          ),
+                        ),
+                        SizedBox(width: gap),
+                        SizedBox(
+                          width: tileSize,
+                          height: tileSize,
+                          child: HomeTile(
+                            label: 'Settings',
+                            icon: Icons.settings_outlined,
+                            route: AppRoutes.settings,
+                            animation: _tile4Anim,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

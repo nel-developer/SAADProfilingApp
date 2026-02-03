@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 
-/// HomeTile - Reusable tile component for home screen
-/// Responsive and scales perfectly for all screen sizes
-/// FIXED: Opacity clamped to prevent assertion errors
+
 class HomeTile extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -43,14 +41,13 @@ class HomeTile extends StatelessWidget {
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Get tile dimensions for responsive sizing
           final size = constraints.maxWidth;
-          
-          // Calculate responsive values
-          final iconSize = size * 0.35; // Icon is 35% of tile size
-          final fontSize = size * 0.16; // Font is 16% of tile size
-          final spacing = size * 0.08; // Spacing is 8% of tile size
-          final borderRadius = size * 0.15; // Border radius is 15% of tile size
+
+          // Proportional values WITH hard caps so they don't blow up
+          final iconSize   = (size * 0.28).clamp(28.0, 48.0);
+          final fontSize   = (size * 0.12).clamp(12.0, 18.0);
+          final spacing    = (size * 0.05).clamp(4.0, 10.0);
+          final borderRadius = (size * 0.18).clamp(12.0, 24.0);
 
           return Container(
             width: double.infinity,
@@ -66,64 +63,76 @@ class HomeTile extends StatelessWidget {
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      icon,
-                      size: iconSize,
-                      color: Colors.white,
-                    ),
-                    SizedBox(height: spacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: size * 0.08),
-                      child: Text(
-                        label,
-                        style: GoogleFonts.poppins(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+            child: Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  /// Icon + Label column
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: iconSize,
+                        color: Colors.white,
+                      ),
+                      SizedBox(height: spacing),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: size * 0.05),
+                        child: Text(
+                          label,
+                          style: GoogleFonts.poppins(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-                if (!isEnabled)
-                  Positioned.fill(
-                    child: Center(
-                      child: Icon(
-                        Icons.lock,
-                        size: iconSize * 0.8,
-                        color: Colors.white.withOpacity(0.7),
-                      ),
-                    ),
+                    ],
                   ),
-              ],
+
+                  /// Lock overlay (disabled state)
+                  if (!isEnabled)
+                    Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(borderRadius),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.lock,
+                          size: iconSize * 0.7,
+                          color: Colors.white.withOpacity(0.85),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         },
       ),
     );
 
-    // Apply animation if provided - WITH CLAMPING TO FIX ERROR
+    /// Animation wrapper
     if (animation != null) {
       return AnimatedBuilder(
         animation: animation!,
         builder: (context, child) {
-          // CRITICAL FIX: Clamp animation value to 0.0-1.0
           final clampedValue = animation!.value.clamp(0.0, 1.0);
-          
           return Opacity(
-            opacity: clampedValue, // Use clamped value
+            opacity: clampedValue,
             child: Transform.scale(
-              scale: clampedValue, // Use clamped value
+              scale: clampedValue,
               child: tile,
             ),
           );

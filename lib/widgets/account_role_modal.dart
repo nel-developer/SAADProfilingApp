@@ -20,35 +20,31 @@ class AccountRoleModal extends StatelessWidget {
     final size = MediaQuery.of(context).size;
     final width = size.width;
 
-    // Responsive font sizes
-    final isTablet = width > 600;
-    final isLargeTablet = width > 900;
-
-    final titleFontSize = isLargeTablet ? 28.0 : isTablet ? 24.0 : 22.0;
-    final roleTitleFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
-    final roleDescFontSize = isLargeTablet ? 16.0 : isTablet ? 15.0 : 14.0;
-
-    // Fixed card height so all 3 options are equal size
-    final cardHeight = isLargeTablet ? 90.0 : isTablet ? 80.0 : 72.0;
+    // Responsive font sizes — clamped tighter for small screens
+    final titleFontSize   = (width * 0.045).clamp(16.0, 24.0);
+    final roleTitleFont   = (width * 0.038).clamp(14.0, 18.0);
+    final roleDescFont    = (width * 0.032).clamp(11.0, 15.0);
 
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(
-        horizontal: width * 0.08,
+        horizontal: width * 0.06,
       ),
       child: Container(
+        // Let the dialog width be constrained by insetPadding naturally
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header with close button
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     'Account Role',
@@ -60,10 +56,7 @@ class AccountRoleModal extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(
-                      Icons.close,
-                      size: isTablet ? 32 : 28,
-                    ),
+                    icon: const Icon(Icons.close, size: 24),
                     color: Colors.grey.shade600,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -72,9 +65,9 @@ class AccountRoleModal extends StatelessWidget {
               ),
             ),
 
-            // Role options — all equal height, evenly spaced
+            // Role options
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 children: [
                   _buildRoleOption(
@@ -82,29 +75,26 @@ class AccountRoleModal extends StatelessWidget {
                     'Admin Role',
                     'Supervision of all of the accounts',
                     'Admin',
-                    cardHeight,
-                    roleTitleFontSize,
-                    roleDescFontSize,
+                    roleTitleFont,
+                    roleDescFont,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   _buildRoleOption(
                     context,
                     'Moderator',
                     'Accept and Decline Data',
                     'Moderator',
-                    cardHeight,
-                    roleTitleFontSize,
-                    roleDescFontSize,
+                    roleTitleFont,
+                    roleDescFont,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   _buildRoleOption(
                     context,
                     'Profiler',
                     'Collect Data',
                     'Profiler',
-                    cardHeight,
-                    roleTitleFontSize,
-                    roleDescFontSize,
+                    roleTitleFont,
+                    roleDescFont,
                   ),
                 ],
               ),
@@ -120,7 +110,6 @@ class AccountRoleModal extends StatelessWidget {
     String title,
     String description,
     String role,
-    double cardHeight,
     double titleFontSize,
     double descFontSize,
   ) {
@@ -132,41 +121,48 @@ class AccountRoleModal extends StatelessWidget {
         onRoleSelected(role);
       },
       child: Container(
-        height: cardHeight,
+        // No fixed height — let content determine the size
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(
             color: isSelected ? DAColors.primaryGreen : Colors.grey.shade300,
-            width: isSelected ? 3 : 2,
+            width: isSelected ? 2.5 : 1.5,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
         ),
+        // Expanded inside Row so text gets full available width
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: GoogleFonts.poppins(
-                    fontSize: descFontSize,
-                    color: Colors.grey.shade600,
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: GoogleFonts.poppins(
+                      fontSize: descFontSize,
+                      color: Colors.grey.shade600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
