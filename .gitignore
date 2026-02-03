@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+da-saad-profiling-firebase-adminsdk-fbsvc-5bf9c6bb42.json
+node_modules/
+# ensure node_modules/ is in .gitignore
+Add-Content .gitignore "node_modules/"

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/services/firebase_auth_service.dart';
@@ -126,20 +127,59 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
 
     try {
-      await _authService.loginWithEmailPassword(
+      final userCredential = await _authService.loginWithEmailPassword(
         email: email,
         password: password,
       );
 
-      if (mounted) {
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.home,
-        );
+      if (userCredential?.user != null && mounted) {
+        // Fast path: try cached minimal user data first to avoid blocking login
+        final uid = userCredential!.user!.uid;
+        final cached = await _authService.getCachedUserData(uid);
+
+        String? accountStatus = cached?['accountStatus'] as String?;
+
+        if (accountStatus != null) {
+          // We have cached status — route immediately
+          if (accountStatus == 'pending_review') {
+            Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
+          } else if (accountStatus == 'rejected') {
+            await _authService.signOut();
+            if (mounted) _showErrorDialog('Your account has been rejected. Please contact support.');
+          } else {
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+          }
+
+          // Refresh userData in background to update cache
+          // ignore: unawaited_futures
+          _authService.getUserData(uid);
+        } else {
+          // No cached data — fetch with retry/backoff (added in service)
+          final userData = await _authService.getUserData(uid);
+          accountStatus = userData?['accountStatus'];
+
+          if (accountStatus == 'pending_review') {
+            Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
+          } else if (accountStatus == 'rejected') {
+            await _authService.signOut();
+            if (mounted) _showErrorDialog('Your account has been rejected. Please contact support.');
+          } else {
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
-        _showErrorDialog(e.toString());
+        String message;
+        if (e is FirebaseAuthException) {
+          message = e.message ?? 'Login failed. Please try again.';
+        } else if (e is Exception) {
+          message = e.toString();
+        } else {
+          message = 'An unknown error occurred.';
+        }
+
+        _showErrorDialog(message);
       }
     } finally {
       if (mounted) {
@@ -404,7 +444,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         context,
                                         AppRoutes.register,
                                       );
-                                    },
+                                    }, minimumSize: Size(0, 0),
                                     child: Text(
                                       'Sign Up',
                                       style: GoogleFonts.poppins(
@@ -412,7 +452,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         color: DAColors.orange,
                                         fontWeight: FontWeight.bold,
                                       ),
-                                    ), minimumSize: Size(0, 0),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -424,14 +464,14 @@ class _LoginScreenState extends State<LoginScreen>
                                     context,
                                     AppRoutes.accountUnderReview,
                                   );
-                                },
+                                }, minimumSize: Size(0, 0),
                                 child: Text(
                                   '[TEST] Go to Under Review',
                                   style: GoogleFonts.poppins(
                                     fontSize: testFontSize,
                                     color: Colors.white54,
                                   ),
-                                ), minimumSize: Size(0, 0),
+                                ),
                               ),
                             ],
                           ),

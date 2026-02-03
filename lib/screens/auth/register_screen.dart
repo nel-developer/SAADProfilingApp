@@ -471,7 +471,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 padding: EdgeInsets.zero,
                                 onPressed: () {
                                   Navigator.pop(context);
-                                },
+                                }, minimumSize: Size(0, 0),
                                 child: Text(
                                   'Login',
                                   style: GoogleFonts.poppins(
@@ -479,7 +479,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     color: DAColors.orange,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                ), minimumSize: Size(0, 0),
+                                ),
                               ),
                             ],
                           ),

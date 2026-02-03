@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/theme/da_colors.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'dart:math';
+import 'dart:async';
 
 class AccountUnderReviewScreen extends StatefulWidget {
   const AccountUnderReviewScreen({super.key});
@@ -19,6 +22,9 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
   late Animation<double> _logoScaleAnim;
   late Animation<double> _cardSlideAnim;
   late Animation<double> _cardOpacityAnim;
+  
+  final FirebaseAuthService _authService = FirebaseAuthService();
+  late Timer? _approvalCheckTimer;
 
   static const double _refWidth = 393.0;
   static const double _refHeight = 852.0;
@@ -61,11 +67,36 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
     );
 
     _controller.forward();
+    _startApprovalCheck();
+  }
+
+  /// Periodically check if the account was approved
+  void _startApprovalCheck() {
+    _approvalCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      try {
+        final userData = await _authService.getUserData(user.uid);
+        if (userData != null) {
+          final accountStatus = userData['accountStatus'];
+          if (accountStatus == 'approved') {
+            _approvalCheckTimer?.cancel();
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, AppRoutes.home);
+            }
+          }
+        }
+      } catch (e) {
+        print('Error checking approval status: $e');
+      }
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _approvalCheckTimer?.cancel();
     super.dispose();
   }
 

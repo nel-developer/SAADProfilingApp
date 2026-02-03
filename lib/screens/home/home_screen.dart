@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/widgets/home_tile.dart';
 import 'package:da_project_1/widgets/green_header_section.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,9 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _tile4Anim;
   late Animation<double> _leafLeftAnim;
   late Animation<double> _leafRightAnim;
+  
+  final FirebaseAuthService _authService = FirebaseAuthService();
+  String? _userRole;
 
   @override
   void initState() {
@@ -89,6 +93,33 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     _controller.forward();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final user = _authService.currentUser;
+    if (user != null) {
+      final userData = await _authService.getUserData(user.uid);
+      setState(() {
+        _userRole = userData?['role'] as String?;
+      });
+    }
+  }
+
+  void _showLockedAlert() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Admin Only'),
+        content: const Text('This feature is only available to administrators.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -304,6 +335,8 @@ class _HomeScreenState extends State<HomeScreen>
                                 icon: Icons.people_outline,
                                 route: AppRoutes.accounts,
                                 animation: _tile3Anim,
+                                isEnabled: _userRole?.toLowerCase() == 'admin',
+                                onDisabledTap: _showLockedAlert,
                               ),
                             ),
                             SizedBox(width: tileSpacing),

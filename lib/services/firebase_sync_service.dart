@@ -67,10 +67,6 @@ class FirebaseSyncService {
       // For client-side, we can only check Firestore collection
       // This would require maintaining an 'isActive' flag in Firestore
       
-      // Get all Firestore user UIDs
-      final firestoreUsers =
-          await _firestore.collection('users').get();
-
       // Return empty list - auth user listing requires Admin SDK
       return [];
     } catch (e) {

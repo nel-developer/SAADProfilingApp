@@ -11,6 +11,8 @@ class HomeTile extends StatelessWidget {
   final String? route;
   final VoidCallback? onTap;
   final Animation<double>? animation;
+  final bool isEnabled;
+  final VoidCallback? onDisabledTap;
 
   const HomeTile({
     super.key,
@@ -19,12 +21,20 @@ class HomeTile extends StatelessWidget {
     this.route,
     this.onTap,
     this.animation,
+    this.isEnabled = true,
+    this.onDisabledTap,
   });
 
   @override
   Widget build(BuildContext context) {
     Widget tile = GestureDetector(
       onTap: () {
+        if (!isEnabled) {
+          if (onDisabledTap != null) {
+            onDisabledTap!();
+          }
+          return;
+        }
         if (onTap != null) {
           onTap!();
         } else if (route != null) {
@@ -46,41 +56,55 @@ class HomeTile extends StatelessWidget {
             width: double.infinity,
             height: double.infinity,
             decoration: BoxDecoration(
-              color: DAColors.primaryGreen,
+              color: isEnabled ? DAColors.primaryGreen : Colors.grey.shade400,
               borderRadius: BorderRadius.circular(borderRadius),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(isEnabled ? 0.1 : 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
               children: [
-                Icon(
-                  icon,
-                  size: iconSize,
-                  color: Colors.white,
-                ),
-                SizedBox(height: spacing),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: size * 0.08),
-                  child: Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w700,
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: iconSize,
                       color: Colors.white,
-                      letterSpacing: 0.5,
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    SizedBox(height: spacing),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: size * 0.08),
+                      child: Text(
+                        label,
+                        style: GoogleFonts.poppins(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
+                if (!isEnabled)
+                  Positioned.fill(
+                    child: Center(
+                      child: Icon(
+                        Icons.lock,
+                        size: iconSize * 0.8,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );

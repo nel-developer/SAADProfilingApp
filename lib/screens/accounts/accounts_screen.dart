@@ -6,6 +6,8 @@ import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/widgets/filter_tab.dart';
 import 'package:da_project_1/widgets/account_card.dart';
 import 'package:da_project_1/widgets/account_role_modal.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
@@ -22,60 +24,13 @@ class _AccountsScreenState extends State<AccountsScreen>
   late Animation<double> _leafLeftAnim;
   late Animation<double> _leafRightAnim;
 
-  String _selectedFilter = 'Admin'; // Admin, Profiler, Moderator, Pending
+  String _selectedFilter = 'Pending'; // Start with Pending to show new registrations
   final TextEditingController _searchController = TextEditingController();
+  final FirebaseAuthService _authService = FirebaseAuthService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // DUMMY DATA - Replace with actual data from your backend
-  final List<Map<String, dynamic>> _allAccounts = [
-    {
-      'name': 'Janeiroh Ilag',
-      'email': 'jirohilag@gmail.com',
-      'role': 'Admin',
-      'status': 'Active',
-      'date': '2026-01-28',
-      'isPending': false,
-    },
-    {
-      'name': 'Janeiroh Ilag',
-      'email': 'jirohilag@gmail.com',
-      'role': 'Pending',
-      'status': 'Pending',
-      'date': '2026-01-28',
-      'isPending': true,
-    },
-    {
-      'name': 'Janeiroh Ilag',
-      'email': 'jirohilag@gmail.com',
-      'role': 'Pending',
-      'status': 'Pending',
-      'date': '2026-01-28',
-      'isPending': true,
-    },
-    {
-      'name': 'Janeiroh Ilag',
-      'email': 'jirohilag@gmail.com',
-      'role': 'Pending',
-      'status': 'Pending',
-      'date': '2026-01-28',
-      'isPending': true,
-    },
-    {
-      'name': 'Janeiroh Ilag',
-      'email': 'jirohilag@gmail.com',
-      'role': 'Profiler',
-      'status': 'Active',
-      'date': '2026-01-28',
-      'isPending': false,
-    },
-    {
-      'name': 'Janeiroh Ilag',
-      'email': 'jirohilag@gmail.com',
-      'role': 'Moderator',
-      'status': 'Inactive',
-      'date': '2026-01-28',
-      'isPending': false,
-    },
-  ];
+  List<Map<String, dynamic>> _allAccounts = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -114,6 +69,52 @@ class _AccountsScreenState extends State<AccountsScreen>
     );
 
     _controller.forward();
+    _loadAccounts();
+  }
+
+  /// Fetch all users (pending and approved) from Firestore
+  Future<void> _loadAccounts() async {
+    try {
+      final snapshot = await _firestore.collection('users').get();
+      final accounts = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final createdAt = data['createdAt'] as Timestamp?;
+        final dateStr = createdAt != null
+            ? createdAt.toDate().toString().split(' ')[0]
+            : DateTime.now().toString().split(' ')[0];
+
+        // Map role for display (capitalize)
+        String roleForDisplay = data['role']?.toString() ?? 'user';
+        roleForDisplay = roleForDisplay[0].toUpperCase() + roleForDisplay.substring(1);
+
+        final status = data['accountStatus'] ?? 'pending_review';
+        final isPending = status == 'pending_review';
+
+        return {
+          'uid': doc.id,
+          'name': '${data['firstName'] ?? ''} ${data['middleName'] ?? ''} ${data['lastName'] ?? ''}'.trim(),
+          'email': data['email'] ?? '',
+          'role': roleForDisplay,
+          'status': isPending ? 'Pending' : 'Active',
+          'date': dateStr,
+          'isPending': isPending,
+          'accountStatus': status,
+        };
+      }).toList();
+
+      setState(() {
+        _allAccounts = accounts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading accounts: $e');
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading accounts: $e'), backgroundColor: DAColors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -140,7 +141,10 @@ class _AccountsScreenState extends State<AccountsScreen>
 
   List<Map<String, dynamic>> get _filteredAccounts {
     return _allAccounts.where((account) {
-      return account['role'] == _selectedFilter;
+      if (_selectedFilter == 'Pending') {
+        return account['isPending'] == true;
+      }
+      return account['role'].toLowerCase() == _selectedFilter.toLowerCase();
     }).toList();
   }
 
@@ -152,21 +156,49 @@ class _AccountsScreenState extends State<AccountsScreen>
       builder: (BuildContext dialogContext) {
         return AccountRoleModal(
           currentRole: account?['role'],
-          onRoleSelected: (selectedRole) {
-            // TODO: Implement role assignment logic here
-            // This is where your backend function will be called
-
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  isEdit
-                      ? 'Account role updated to $selectedRole'
-                      : 'Account accepted as $selectedRole',
-                ),
-                backgroundColor: DAColors.primaryGreen,
-              ),
-            );
+          onRoleSelected: (selectedRole) async {
+            Navigator.pop(dialogContext);
+            
+            try {
+              if (isEdit) {
+                // Update existing role
+                await _authService.updateUserRole(
+                  account!['uid'],
+                  selectedRole.toLowerCase(),
+                );
+              } else {
+                // Approve user with new role
+                await _authService.approveUserWithRole(
+                  account!['uid'],
+                  selectedRole.toLowerCase(),
+                );
+              }
+              
+              // Reload accounts
+              await _loadAccounts();
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isEdit
+                          ? 'Account role updated to $selectedRole'
+                          : 'Account approved as $selectedRole',
+                    ),
+                    backgroundColor: DAColors.primaryGreen,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: DAColors.red,
+                  ),
+                );
+              }
+            }
           },
         );
       },
@@ -178,14 +210,32 @@ class _AccountsScreenState extends State<AccountsScreen>
     _showAccountRoleModal(context, account: account, isEdit: false);
   }
 
-  void _handleDecline(Map<String, dynamic> account) {
-    // TODO: Implement decline logic here
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Account declined: ${account['email']}'),
-        backgroundColor: DAColors.red,
-      ),
-    );
+  void _handleDecline(Map<String, dynamic> account) async {
+    try {
+      await _authService.rejectUser(
+        account['uid'],
+        'Rejected by admin',
+      );
+      await _loadAccounts();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Account declined: ${account['email']}'),
+            backgroundColor: DAColors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error declining account: $e'),
+            backgroundColor: DAColors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _handleEdit(Map<String, dynamic> account) {
@@ -387,31 +437,47 @@ class _AccountsScreenState extends State<AccountsScreen>
 
           /// ACCOUNTS LIST
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(
-                horizontal: width * 0.06,
-                vertical: height * 0.01,
-              ),
-              itemCount: _filteredAccounts.length,
-              itemBuilder: (context, index) {
-                final account = _filteredAccounts[index];
-                return Padding(
-                  padding: EdgeInsets.only(bottom: height * 0.02),
-                  child: AccountCard(
-                    name: account['name'],
-                    email: account['email'],
-                    date: account['date'],
-                    role: account['role'],
-                    status: account['status'],
-                    isPending: account['isPending'],
-                    roleColor: _getRoleColor(account['role']),
-                    onAccept: () => _handleAccept(account),
-                    onDecline: () => _handleDecline(account),
-                    onEdit: () => _handleEdit(account),
-                  ),
-                );
-              },
-            ),
+            child: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      color: DAColors.primaryGreen,
+                    ),
+                  )
+                : _filteredAccounts.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No accounts found',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: width * 0.06,
+                          vertical: height * 0.01,
+                        ),
+                        itemCount: _filteredAccounts.length,
+                        itemBuilder: (context, index) {
+                          final account = _filteredAccounts[index];
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: height * 0.02),
+                            child: AccountCard(
+                              name: account['name'],
+                              email: account['email'],
+                              date: account['date'],
+                              role: account['role'],
+                              status: account['status'],
+                              isPending: account['isPending'],
+                              roleColor: _getRoleColor(account['role']),
+                              onAccept: () => _handleAccept(account),
+                              onDecline: () => _handleDecline(account),
+                              onEdit: () => _handleEdit(account),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

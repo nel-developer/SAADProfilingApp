@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:da_project_1/theme/da_colors.dart';
 
 /// CustomTextField - Reusable styled text input field
 /// Used for search bars, forms, and other text inputs
