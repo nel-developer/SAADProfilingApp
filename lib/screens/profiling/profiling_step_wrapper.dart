@@ -289,10 +289,10 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               child: Theme(
                 data: Theme.of(context).copyWith(
                   scrollbarTheme: ScrollbarThemeData(
-                    thumbColor: MaterialStateProperty.all(
+                    thumbColor: WidgetStateProperty.all(
                       DAColors.primaryGreen.withOpacity(0.5), // ← Light green!
                     ),
-                    thickness: MaterialStateProperty.all(4.0),
+                    thickness: WidgetStateProperty.all(4.0),
                     radius: const Radius.circular(8),
                   ),
                 ),

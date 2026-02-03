@@ -323,7 +323,7 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(
