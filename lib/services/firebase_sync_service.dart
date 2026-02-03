@@ -70,7 +70,6 @@ class FirebaseSyncService {
       // Get all Firestore user UIDs
       final firestoreUsers =
           await _firestore.collection('users').get();
-      final firestoreUids = firestoreUsers.docs.map((doc) => doc.id).toSet();
 
       // Return empty list - auth user listing requires Admin SDK
       return [];

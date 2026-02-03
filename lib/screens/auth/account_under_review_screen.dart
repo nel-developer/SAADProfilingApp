@@ -95,7 +95,7 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
     final spacingAfterSubtitle = _refHeight * 0.04 * scale;
     final buttonHeight = 50.0 * scale;
     final buttonRadius = 25.0 * scale;
-    final buttonFontSize = 18.0 * scale; // Fixed: Based on scale, not absolute percentage
+    final buttonFontSize = 18.0 * scale;
 
     return Scaffold(
       body: Stack(
@@ -117,142 +117,129 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
 
           /// CONTENT
           SafeArea(
-            child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.top -
-                      MediaQuery.of(context).padding.bottom,
-                ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    children: [
-                      SizedBox(height: logoTopPad),
+            child: Column(
+              children: [
+                SizedBox(height: logoTopPad),
 
-                      /// LOGO
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _logoOpacityAnim.value,
-                            child: Transform.scale(
-                              scale: _logoScaleAnim.value,
-                              child: Image.asset(
-                                'assets/images/da_logo.png',
-                                width: logoWidth,
-                              ),
-                            ),
-                          );
-                        },
+                /// LOGO
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _logoOpacityAnim.value,
+                      child: Transform.scale(
+                        scale: _logoScaleAnim.value,
+                        child: Image.asset(
+                          'assets/images/da_logo.png',
+                          width: logoWidth,
+                        ),
                       ),
+                    );
+                  },
+                ),
 
-                      SizedBox(height: spacingAfterLogo),
+                SizedBox(height: spacingAfterLogo),
 
-                      /// WHITE CARD
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _cardOpacityAnim.value,
-                            child: Transform.translate(
-                              offset: Offset(0, _cardSlideAnim.value),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: cardHorizontalPad,
+                /// WHITE CARD
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _cardOpacityAnim.value,
+                      child: Transform.translate(
+                        offset: Offset(0, _cardSlideAnim.value),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: cardHorizontalPad,
+                          ),
+                          child: Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(cardPadding),
+                            decoration: BoxDecoration(
+                              color: DAColors.white,
+                              borderRadius: BorderRadius.circular(cardRadius),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                /// ICON
+                                Icon(
+                                  Icons.description_outlined,
+                                  size: iconSize,
+                                  color: DAColors.primaryGreen,
                                 ),
-                                child: Container(
+
+                                SizedBox(height: spacingAfterIcon),
+
+                                /// TITLE
+                                Text(
+                                  'Your account\nis under review',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: titleFontSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: DAColors.black,
+                                  ),
+                                ),
+
+                                SizedBox(height: spacingAfterTitle),
+
+                                /// SUBTITLE
+                                Text(
+                                  'Your account has been submitted &\nwill be reviewed by the admin.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: subtitleFontSize,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+
+                                SizedBox(height: spacingAfterSubtitle),
+
+                                /// BACK TO LOGIN BUTTON
+                                SizedBox(
                                   width: double.infinity,
-                                  padding: EdgeInsets.all(cardPadding),
-                                  decoration: BoxDecoration(
-                                    color: DAColors.white,
-                                    borderRadius:
-                                        BorderRadius.circular(cardRadius),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      /// ICON
-                                      Icon(
-                                        Icons.description_outlined,
-                                        size: iconSize,
-                                        color: DAColors.primaryGreen,
+                                  height: buttonHeight,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pushReplacementNamed(
+                                        context,
+                                        AppRoutes.login,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: DAColors.primaryGreen,
+                                      foregroundColor: DAColors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(buttonRadius),
                                       ),
-
-                                      SizedBox(height: spacingAfterIcon),
-
-                                      /// TITLE
-                                      Text(
-                                        'Your account\nis under review',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: titleFontSize,
-                                          fontWeight: FontWeight.bold,
-                                          color: DAColors.black,
-                                        ),
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: buttonHeight * 0.25,
+                                        horizontal: 20 * scale,
                                       ),
-
-                                      SizedBox(height: spacingAfterTitle),
-
-                                      /// SUBTITLE
-                                      Text(
-                                        'Your account has been submitted &\nwill be reviewed by the admin.',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: subtitleFontSize,
-                                          color: Colors.grey,
-                                        ),
+                                    ),
+                                    child: Text(
+                                      'Back to Login',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: buttonFontSize,
+                                        fontWeight: FontWeight.bold,
+                                        color: DAColors.white,
+                                        height: 1.2,
                                       ),
-
-                                      SizedBox(height: spacingAfterSubtitle),
-
-                                      /// BACK TO LOGIN BUTTON
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: buttonHeight,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.pushReplacementNamed(
-                                              context,
-                                              AppRoutes.login,
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                DAColors.primaryGreen,
-                                            foregroundColor: DAColors.white,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(
-                                                  buttonRadius),
-                                            ),
-                                            elevation: 0,
-                                            padding: EdgeInsets.symmetric(
-                                              vertical: buttonHeight * 0.25,
-                                              horizontal: 20 * scale,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'Back to Login',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: buttonFontSize,
-                                              fontWeight: FontWeight.bold,
-                                              color: DAColors.white,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              ),
+              ],
             ),
           ),
         ],

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/routes/app_routes.dart';
-import 'package:da_project_1/theme/da_colors.dart';
+import 'package:da_project_1/widgets/home_tile.dart';
+import 'package:da_project_1/widgets/green_header_section.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +20,8 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _tile2Anim;
   late Animation<double> _tile3Anim;
   late Animation<double> _tile4Anim;
+  late Animation<double> _leafLeftAnim;
+  late Animation<double> _leafRightAnim;
 
   @override
   void initState() {
@@ -26,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 1800),
     );
 
     _headerOpacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -71,6 +74,20 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
 
+    _leafLeftAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _leafRightAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.1, 0.6, curve: Curves.easeOut),
+      ),
+    );
+
     _controller.forward();
   }
 
@@ -82,267 +99,234 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
 
-    final List<Map<String, dynamic>> tiles = [
-      {
-        'label': 'Dashboard',
-        'icon': Icons.grid_view_outlined,
-        'route': AppRoutes.dashboard,
-      },
-      {
-        'label': 'Profiling',
-        'icon': Icons.person_outline,
-        'route': null, // TODO: profiling route
-      },
-      {
-        'label': 'Accounts',
-        'icon': Icons.people_outline,
-        'route': AppRoutes.accounts,
-      },
-      {
-        'label': 'Settings',
-        'icon': Icons.settings_outlined,
-        'route': AppRoutes.settings,
-      },
-    ];
+    // Responsive breakpoints
+    final isTablet = width > 600;
+    final isLargeTablet = width > 900;
 
-    final List<Animation<double>> tileAnims = [
-      _tile1Anim,
-      _tile2Anim,
-      _tile3Anim,
-      _tile4Anim,
-    ];
+    // HEADER HEIGHT
+    final headerHeight = height * (isLargeTablet ? 0.18 : isTablet ? 0.22 : 0.28);
+    
+    // TEXT SIZE - LUMALAKI SA TABLET! ⬆️⬆️⬆️
+    final welcomeFontSize = isLargeTablet 
+        ? 48.0  // Large tablet: 48px - MAS MALAKI! 🔥
+        : isTablet 
+            ? 38.0  // Tablet: 38px - BIGGER! ⬆️
+            : width * 0.065; // Phone: 6.5% of width
+    
+    // AVATAR SIZE - LUMALAKI SA TABLET! ⬆️⬆️⬆️
+    final avatarRadius = isLargeTablet
+        ? 55.0  // Large tablet: 55px radius - MAS MALAKI! 🔥
+        : isTablet
+            ? 45.0  // Tablet: 45px radius - BIGGER! ⬆️
+            : width * 0.085; // Phone: 8.5% of width
 
-    return Column(
-      children: [
-        /// GREEN HEADER
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _headerOpacityAnim.value,
-              child: Transform.translate(
-                offset: Offset(0, _headerSlideAnim.value),
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.only(
-                    top: screenHeight * 0.06,
-                    bottom: screenHeight * 0.05,
-                    left: screenWidth * 0.06,
-                    right: screenWidth * 0.06,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: DAColors.primaryGreen,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(24),
-                      bottomRight: Radius.circular(24),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      /// WELCOME TEXT
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Welcome,\n',
-                              style: GoogleFonts.poppins(
-                                fontSize: screenWidth * 0.07,
-                                fontWeight: FontWeight.bold,
-                                color: DAColors.white,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'Juan!',
-                              style: GoogleFonts.poppins(
-                                fontSize: screenWidth * 0.07,
-                                fontWeight: FontWeight.bold,
-                                color: DAColors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+    // TILES SIZING
+    final tileGridPadding = isLargeTablet
+        ? 60.0
+        : isTablet
+            ? width * 0.08
+            : width * 0.06;
+    
+    final tileSpacing = isLargeTablet
+        ? 40.0
+        : isTablet
+            ? width * 0.05
+            : width * 0.04;
 
-                      /// AVATAR
-                      CircleAvatar(
-                        radius: screenWidth * 0.09,
-                        backgroundColor: Colors.grey.shade400,
-                        child: Icon(
-                          Icons.person,
-                          size: screenWidth * 0.1,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+    // HEADER PADDING
+    final headerHorizontalPadding = isLargeTablet
+        ? 80.0
+        : width * 0.06;
+    
+    final headerVerticalPadding = isLargeTablet
+        ? 30.0
+        : height * 0.025;
 
-        /// TILES SECTION
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.all(screenWidth * 0.06),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    return Scaffold(
+      backgroundColor: const Color(0xFFE8E8E8),
+      body: Column(
+        children: [
+          /// GREEN HEADER WITH CONTENT
+          SizedBox(
+            height: headerHeight,
+            child: Stack(
               children: [
-                Row(
-                  children: [
-                    /// DASHBOARD TILE
-                    Expanded(
-                      child: AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: tileAnims[0].value,
-                            child: Transform.scale(
-                              scale: tileAnims[0].value,
-                              child: _buildTile(
-                                context,
-                                label: tiles[0]['label'],
-                                icon: tiles[0]['icon'],
-                                route: tiles[0]['route'],
-                                screenWidth: screenWidth,
-                                screenHeight: screenHeight,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(width: screenWidth * 0.04),
-
-                    /// PROFILING TILE
-                    Expanded(
-                      child: AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: tileAnims[1].value,
-                            child: Transform.scale(
-                              scale: tileAnims[1].value,
-                              child: _buildTile(
-                                context,
-                                label: tiles[1]['label'],
-                                icon: tiles[1]['icon'],
-                                route: tiles[1]['route'],
-                                screenWidth: screenWidth,
-                                screenHeight: screenHeight,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                /// REUSABLE GREEN HEADER BACKGROUND WITH LEAFS
+                GreenHeaderSection(
+                  leafLeftAnimation: _leafLeftAnim,
+                  leafRightAnimation: _leafRightAnim,
+                  customHeight: headerHeight,
                 ),
-                SizedBox(height: screenWidth * 0.04),
-                Row(
-                  children: [
-                    /// ACCOUNTS TILE
-                    Expanded(
-                      child: AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: tileAnims[2].value,
-                            child: Transform.scale(
-                              scale: tileAnims[2].value,
-                              child: _buildTile(
-                                context,
-                                label: tiles[2]['label'],
-                                icon: tiles[2]['icon'],
-                                route: tiles[2]['route'],
-                                screenWidth: screenWidth,
-                                screenHeight: screenHeight,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(width: screenWidth * 0.04),
 
-                    /// SETTINGS TILE
-                    Expanded(
-                      child: AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: tileAnims[3].value,
-                            child: Transform.scale(
-                              scale: tileAnims[3].value,
-                              child: _buildTile(
-                                context,
-                                label: tiles[3]['label'],
-                                icon: tiles[3]['icon'],
-                                route: tiles[3]['route'],
-                                screenWidth: screenWidth,
-                                screenHeight: screenHeight,
-                              ),
+                /// HEADER CONTENT (Text + Avatar) - RESPONSIVE!
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _headerOpacityAnim.value.clamp(0.0, 1.0),
+                      child: Transform.translate(
+                        offset: Offset(0, _headerSlideAnim.value),
+                        child: Container(
+                          height: headerHeight,
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: headerHorizontalPadding,
+                            vertical: headerVerticalPadding,
+                          ),
+                          child: SafeArea(
+                            bottom: false,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                /// WELCOME TEXT - LUMALAKI SA TABLET!
+                                Flexible(
+                                  flex: 3,
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: 'Welcome,\n',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: welcomeFontSize,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                            height: 1.2,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: 'Juan!',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: welcomeFontSize,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                            height: 1.2,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+
+                                SizedBox(width: width * 0.04),
+
+                                /// AVATAR - LUMALAKI SA TABLET!
+                                CircleAvatar(
+                                  radius: avatarRadius,
+                                  backgroundColor: Colors.white,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: avatarRadius * 1.1,
+                                    color: const Color(0xFF6B6B6B),
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildTile(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required String? route,
-    required double screenWidth,
-    required double screenHeight,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        if (route != null) {
-          Navigator.pushNamed(context, route);
-        }
-      },
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Container(
-          decoration: BoxDecoration(
-            color: DAColors.primaryGreen,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: screenWidth * 0.12,
-                color: DAColors.white,
+          /// TILES GRID SECTION
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.all(tileGridPadding),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth = constraints.maxWidth;
+                  final availableHeight = constraints.maxHeight;
+
+                  // Calculate tile size
+                  final maxTileWidth = (availableWidth - tileSpacing) / 2;
+                  final maxTileHeight = (availableHeight - tileSpacing) / 2;
+
+                  final tileSize = (maxTileWidth < maxTileHeight
+                          ? maxTileWidth
+                          : maxTileHeight)
+                      .clamp(100.0, 250.0);
+
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        /// ROW 1: Dashboard & Profiling
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: tileSize,
+                              height: tileSize,
+                              child: HomeTile(
+                                label: 'Dashboard',
+                                icon: Icons.grid_view_outlined,
+                                route: AppRoutes.dashboard,
+                                animation: _tile1Anim,
+                              ),
+                            ),
+                            SizedBox(width: tileSpacing),
+                            SizedBox(
+                              width: tileSize,
+                              height: tileSize,
+                              child: HomeTile(
+                                label: 'Profiling',
+                                icon: Icons.person_outline,
+                                route: null,
+                                animation: _tile2Anim,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: tileSpacing),
+
+                        /// ROW 2: Accounts & Settings
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: tileSize,
+                              height: tileSize,
+                              child: HomeTile(
+                                label: 'Accounts',
+                                icon: Icons.people_outline,
+                                route: AppRoutes.accounts,
+                                animation: _tile3Anim,
+                              ),
+                            ),
+                            SizedBox(width: tileSpacing),
+                            SizedBox(
+                              width: tileSize,
+                              height: tileSize,
+                              child: HomeTile(
+                                label: 'Settings',
+                                icon: Icons.settings_outlined,
+                                route: AppRoutes.settings,
+                                animation: _tile4Anim,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              SizedBox(height: screenHeight * 0.02),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: screenWidth * 0.045,
-                  fontWeight: FontWeight.bold,
-                  color: DAColors.white,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

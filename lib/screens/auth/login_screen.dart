@@ -182,12 +182,13 @@ class _LoginScreenState extends State<LoginScreen>
     final spacingBeforeButton = _refHeight * 0.03 * scale;
     final buttonHeight = 50.0 * scale;
     final buttonRadius = 25.0 * scale;
-    final buttonFontSize = 18.0 * scale; // Fixed: Based on scale, not absolute percentage
+    final buttonFontSize = 18.0 * scale;
     final bottomFontSize = _refWidth * 0.035 * scale;
     final testFontSize = _refWidth * 0.03 * scale;
     final spacingAfterButton = _refHeight * 0.02 * scale;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           /// BACKGROUND
@@ -214,233 +215,230 @@ class _LoginScreenState extends State<LoginScreen>
                       MediaQuery.of(context).padding.top -
                       MediaQuery.of(context).padding.bottom,
                 ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      SizedBox(height: logoTopPad),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(height: logoTopPad),
 
-                      /// LOGO
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _logoOpacityAnim.value,
-                            child: Transform.scale(
-                              scale: _logoScaleAnim.value,
-                              child: Image.asset(
-                                'assets/images/da_logo.png',
-                                width: logoWidth,
-                              ),
+                    /// LOGO
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _logoOpacityAnim.value,
+                          child: Transform.scale(
+                            scale: _logoScaleAnim.value,
+                            child: Image.asset(
+                              'assets/images/da_logo.png',
+                              width: logoWidth,
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
+                    ),
 
-                      SizedBox(height: spacingAfterLogo),
+                    SizedBox(height: spacingAfterLogo),
 
-                      /// TITLE
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _titleOpacityAnim.value,
-                            child: Text(
-                              'Login',
-                              style: GoogleFonts.poppins(
-                                fontSize: titleFontSize,
-                                fontWeight: FontWeight.bold,
-                                color: DAColors.white,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                      SizedBox(height: spacingAfterTitle),
-
-                      /// EMAIL
-                      SlideTransition(
-                        position: _emailSlideAnim,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: fieldHorizontalPad),
-                          child: TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                    /// TITLE
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _titleOpacityAnim.value,
+                          child: Text(
+                            'Login',
                             style: GoogleFonts.poppins(
+                              fontSize: titleFontSize,
+                              fontWeight: FontWeight.bold,
+                              color: DAColors.white,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    SizedBox(height: spacingAfterTitle),
+
+                    /// EMAIL
+                    SlideTransition(
+                      position: _emailSlideAnim,
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                        child: TextField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          style: GoogleFonts.poppins(
+                            fontSize: fieldFontSize,
+                            color: DAColors.black,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Email',
+                            hintStyle: GoogleFonts.poppins(
                               fontSize: fieldFontSize,
-                              color: DAColors.black,
+                              color: Colors.grey,
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'Email',
-                              hintStyle: GoogleFonts.poppins(
-                                fontSize: fieldFontSize,
-                                color: Colors.grey,
-                              ),
-                              fillColor: DAColors.white,
-                              filled: true,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(fieldRadius),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: fieldContentPadH,
-                                vertical: fieldContentPadV,
-                              ),
+                            fillColor: DAColors.white,
+                            filled: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(fieldRadius),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: fieldContentPadH,
+                              vertical: fieldContentPadV,
                             ),
                           ),
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: spacingBetweenFields),
+                    SizedBox(height: spacingBetweenFields),
 
-                      /// PASSWORD
-                      SlideTransition(
-                        position: _passwordSlideAnim,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: fieldHorizontalPad),
-                          child: TextField(
-                            controller: _passwordController,
-                            obscureText: true,
-                            style: GoogleFonts.poppins(
+                    /// PASSWORD
+                    SlideTransition(
+                      position: _passwordSlideAnim,
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                        child: TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          style: GoogleFonts.poppins(
+                            fontSize: fieldFontSize,
+                            color: DAColors.black,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Password',
+                            hintStyle: GoogleFonts.poppins(
                               fontSize: fieldFontSize,
-                              color: DAColors.black,
+                              color: Colors.grey,
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'Password',
-                              hintStyle: GoogleFonts.poppins(
-                                fontSize: fieldFontSize,
-                                color: Colors.grey,
-                              ),
-                              fillColor: DAColors.white,
-                              filled: true,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(fieldRadius),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: fieldContentPadH,
-                                vertical: fieldContentPadV,
-                              ),
+                            fillColor: DAColors.white,
+                            filled: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(fieldRadius),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: fieldContentPadH,
+                              vertical: fieldContentPadV,
                             ),
                           ),
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: spacingBeforeButton),
+                    SizedBox(height: spacingBeforeButton),
 
-                      /// LOGIN BUTTON
-                      SlideTransition(
-                        position: _buttonSlideAnim,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: fieldHorizontalPad),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: buttonHeight,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleLogin,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: DAColors.orange,
-                                foregroundColor: DAColors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(buttonRadius),
-                                ),
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: buttonHeight * 0.25,
-                                  horizontal: 20 * scale,
-                                ),
+                    /// LOGIN BUTTON
+                    SlideTransition(
+                      position: _buttonSlideAnim,
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: buttonHeight,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: DAColors.orange,
+                              foregroundColor: DAColors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(buttonRadius),
                               ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        color: DAColors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(
-                                      'Login',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: buttonFontSize,
-                                        fontWeight: FontWeight.bold,
-                                        color: DAColors.white,
-                                        height: 1.2,
-                                      ),
-                                    ),
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(
+                                vertical: buttonHeight * 0.25,
+                                horizontal: 20 * scale,
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: spacingAfterButton),
-
-                      /// BOTTOM TEXT
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _bottomOpacityAnim.value,
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      "Don't have an account? ",
-                                      style: GoogleFonts.poppins(
-                                        fontSize: bottomFontSize,
-                                        color: DAColors.white,
-                                      ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: DAColors.white,
+                                      strokeWidth: 2,
                                     ),
-                                    CupertinoButton(
-                                      padding: EdgeInsets.zero,
-                                      onPressed: () {
-                                        Navigator.pushNamed(
-                                          context,
-                                          AppRoutes.register,
-                                        );
-                                      }, minimumSize: Size(0, 0),
-                                      child: Text(
-                                        'Sign Up',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: bottomFontSize,
-                                          color: DAColors.orange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: spacingAfterButton * 0.5),
-                                CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () {
-                                    Navigator.pushReplacementNamed(
-                                      context,
-                                      AppRoutes.accountUnderReview,
-                                    );
-                                  }, minimumSize: Size(0, 0),
-                                  child: Text(
-                                    '[TEST] Go to Under Review',
+                                  )
+                                : Text(
+                                    'Login',
                                     style: GoogleFonts.poppins(
-                                      fontSize: testFontSize,
-                                      color: Colors.white54,
+                                      fontSize: buttonFontSize,
+                                      fontWeight: FontWeight.bold,
+                                      color: DAColors.white,
+                                      height: 1.2,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+
+                    SizedBox(height: spacingAfterButton),
+
+                    /// BOTTOM TEXT
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _bottomOpacityAnim.value,
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Don't have an account? ",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: bottomFontSize,
+                                      color: DAColors.white,
+                                    ),
+                                  ),
+                                  CupertinoButton(
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        AppRoutes.register,
+                                      );
+                                    },
+                                    child: Text(
+                                      'Sign Up',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: bottomFontSize,
+                                        color: DAColors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ), minimumSize: Size(0, 0),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: spacingAfterButton * 0.5),
+                              CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () {
+                                  Navigator.pushReplacementNamed(
+                                    context,
+                                    AppRoutes.accountUnderReview,
+                                  );
+                                },
+                                child: Text(
+                                  '[TEST] Go to Under Review',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: testFontSize,
+                                    color: Colors.white54,
+                                  ),
+                                ), minimumSize: Size(0, 0),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),

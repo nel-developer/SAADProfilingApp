@@ -279,11 +279,12 @@ class _RegisterScreenState extends State<RegisterScreen>
     final spacingBeforeButton = _refHeight * 0.03 * scale;
     final buttonHeight = 50.0 * scale;
     final buttonRadius = 25.0 * scale;
-    final buttonFontSize = 18.0 * scale; // Fixed: Based on scale, not absolute percentage
+    final buttonFontSize = 18.0 * scale;
     final bottomFontSize = _refWidth * 0.035 * scale;
     final spacingAfterButton = _refHeight * 0.02 * scale;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           /// BACKGROUND
@@ -310,185 +311,182 @@ class _RegisterScreenState extends State<RegisterScreen>
                       MediaQuery.of(context).padding.top -
                       MediaQuery.of(context).padding.bottom,
                 ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      SizedBox(height: logoTopPad),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(height: logoTopPad),
 
-                      /// LOGO
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _logoOpacityAnim.value,
-                            child: Transform.scale(
-                              scale: _logoScaleAnim.value,
-                              child: Image.asset(
-                                'assets/images/da_logo.png',
-                                width: logoWidth,
+                    /// LOGO
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _logoOpacityAnim.value,
+                          child: Transform.scale(
+                            scale: _logoScaleAnim.value,
+                            child: Image.asset(
+                              'assets/images/da_logo.png',
+                              width: logoWidth,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    SizedBox(height: spacingAfterLogo),
+
+                    /// TITLE
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _titleOpacityAnim.value,
+                          child: Text(
+                            'Register',
+                            style: GoogleFonts.poppins(
+                              fontSize: titleFontSize,
+                              fontWeight: FontWeight.bold,
+                              color: DAColors.white,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    SizedBox(height: spacingAfterTitle),
+
+                    /// FORM FIELDS
+                    Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                      child: Column(
+                        children: [
+                          _buildTextField(
+                            controller: _firstNameController,
+                            hintText: 'First Name',
+                            slideAnim: _firstNameSlideAnim,
+                            scale: scale,
+                          ),
+                          SizedBox(height: spacingBetweenFields),
+                          _buildTextField(
+                            controller: _middleNameController,
+                            hintText: 'Middle Name',
+                            slideAnim: _middleNameSlideAnim,
+                            scale: scale,
+                          ),
+                          SizedBox(height: spacingBetweenFields),
+                          _buildTextField(
+                            controller: _lastNameController,
+                            hintText: 'Last Name',
+                            slideAnim: _lastNameSlideAnim,
+                            scale: scale,
+                          ),
+                          SizedBox(height: spacingBetweenFields),
+                          _buildTextField(
+                            controller: _emailController,
+                            hintText: 'Email',
+                            slideAnim: _emailSlideAnim,
+                            scale: scale,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          SizedBox(height: spacingBetweenFields),
+                          _buildTextField(
+                            controller: _passwordController,
+                            hintText: 'Password',
+                            slideAnim: _passwordSlideAnim,
+                            scale: scale,
+                            obscureText: true,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: spacingBeforeButton),
+
+                    /// REGISTER BUTTON
+                    SlideTransition(
+                      position: _buttonSlideAnim,
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: buttonHeight,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleRegister,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: DAColors.orange,
+                              foregroundColor: DAColors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(buttonRadius),
+                              ),
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(
+                                vertical: buttonHeight * 0.25,
+                                horizontal: 20 * scale,
                               ),
                             ),
-                          );
-                        },
-                      ),
-
-                      SizedBox(height: spacingAfterLogo),
-
-                      /// TITLE
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _titleOpacityAnim.value,
-                            child: Text(
-                              'Register',
-                              style: GoogleFonts.poppins(
-                                fontSize: titleFontSize,
-                                fontWeight: FontWeight.bold,
-                                color: DAColors.white,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                      SizedBox(height: spacingAfterTitle),
-
-                      /// FORM FIELDS
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: fieldHorizontalPad),
-                        child: Column(
-                          children: [
-                            _buildTextField(
-                              controller: _firstNameController,
-                              hintText: 'First Name',
-                              slideAnim: _firstNameSlideAnim,
-                              scale: scale,
-                            ),
-                            SizedBox(height: spacingBetweenFields),
-                            _buildTextField(
-                              controller: _middleNameController,
-                              hintText: 'Middle Name',
-                              slideAnim: _middleNameSlideAnim,
-                              scale: scale,
-                            ),
-                            SizedBox(height: spacingBetweenFields),
-                            _buildTextField(
-                              controller: _lastNameController,
-                              hintText: 'Last Name',
-                              slideAnim: _lastNameSlideAnim,
-                              scale: scale,
-                            ),
-                            SizedBox(height: spacingBetweenFields),
-                            _buildTextField(
-                              controller: _emailController,
-                              hintText: 'Email',
-                              slideAnim: _emailSlideAnim,
-                              scale: scale,
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-                            SizedBox(height: spacingBetweenFields),
-                            _buildTextField(
-                              controller: _passwordController,
-                              hintText: 'Password',
-                              slideAnim: _passwordSlideAnim,
-                              scale: scale,
-                              obscureText: true,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: spacingBeforeButton),
-
-                      /// REGISTER BUTTON
-                      SlideTransition(
-                        position: _buttonSlideAnim,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: fieldHorizontalPad),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: buttonHeight,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleRegister,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: DAColors.orange,
-                                foregroundColor: DAColors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(buttonRadius),
-                                ),
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: buttonHeight * 0.25,
-                                  horizontal: 20 * scale,
-                                ),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        color: DAColors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(
-                                      'Register',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: buttonFontSize,
-                                        fontWeight: FontWeight.bold,
-                                        color: DAColors.white,
-                                        height: 1.2,
-                                      ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: DAColors.white,
+                                      strokeWidth: 2,
                                     ),
-                            ),
+                                  )
+                                : Text(
+                                    'Register',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: buttonFontSize,
+                                      fontWeight: FontWeight.bold,
+                                      color: DAColors.white,
+                                      height: 1.2,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: spacingAfterButton),
+                    SizedBox(height: spacingAfterButton),
 
-                      /// BOTTOM TEXT
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _bottomOpacityAnim.value,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Already have an account? ',
+                    /// BOTTOM TEXT
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _bottomOpacityAnim.value,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Already have an account? ',
+                                style: GoogleFonts.poppins(
+                                  fontSize: bottomFontSize,
+                                  color: DAColors.white,
+                                ),
+                              ),
+                              CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                child: Text(
+                                  'Login',
                                   style: GoogleFonts.poppins(
                                     fontSize: bottomFontSize,
-                                    color: DAColors.white,
+                                    color: DAColors.orange,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                ),
-                                CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  }, minimumSize: Size(0, 0),
-                                  child: Text(
-                                    'Login',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: bottomFontSize,
-                                      color: DAColors.orange,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                                ), minimumSize: Size(0, 0),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),
