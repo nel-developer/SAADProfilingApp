@@ -6,9 +6,9 @@ import 'package:da_project_1/widgets/status_badge.dart';
 
 /// AccountCard - Reusable card widget for displaying account information
 /// Non-pending layout:
-///   Row 1: Name ............... [Role Badge]
-///          email
-///   Row 2: date ......... [Active] [Edit]
+///   Line 1:  Name          [Role Badge]      ← role badge malapit sa name
+///   Line 2:  email
+///   Line 3:  📅 date       [Active] [Edit]   ← status + edit magkatabi
 class AccountCard extends StatelessWidget {
   final String name;
   final String email;
@@ -37,15 +37,6 @@ class AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-
-    final isTablet = width > 600;
-    final isLargeTablet = width > 900;
-
-    final nameFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
-    final emailFontSize = isLargeTablet ? 16.0 : isTablet ? 15.0 : 14.0;
-    final dateFontSize = isLargeTablet ? 14.0 : isTablet ? 13.0 : 12.0;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -66,13 +57,12 @@ class AccountCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child:
-            isPending ? _buildPendingLayout(context) : _buildActiveLayout(context),
+        child: isPending ? _buildPendingLayout(context) : _buildActiveLayout(context),
       ),
     );
   }
 
-  // ─── PENDING: name/email/date left, Accept+Decline stacked right ─────────
+  // ─── PENDING: name/email/date left, Accept+Decline stacked right ────────
   Widget _buildPendingLayout(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isTablet = width > 600;
@@ -84,7 +74,6 @@ class AccountCard extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        /// Left: info
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,7 +114,7 @@ class AccountCard extends StatelessWidget {
         ),
         const SizedBox(width: 12),
 
-        /// Right: Accept / Decline
+        /// Accept / Decline
         Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -139,11 +128,7 @@ class AccountCard extends StatelessWidget {
     );
   }
 
-  // ─── ACTIVE (non-pending) ─────────────────────────────────────────────────
-  //   Line 1:  Name          [Role Badge]      ← role badge malapit sa name
-  //   Line 2:  email
-  //   Line 3:  📅 date       [Active] [Edit]   ← status + edit magkatabi
-  // ────────────────────────────────────────────────────────────────────────────
+  // ─── ACTIVE (non-pending) ───────────────────────────────────────────────
   Widget _buildActiveLayout(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isTablet = width > 600;
@@ -155,19 +140,23 @@ class AccountCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Row 1: Name + Role Badge (malapit sa name) ──
+        // ── Row 1: Name + Role Badge ──
+        // Name ay nasa Expanded — kung kulang ang space, yung name ang mag-ellipsis,
+        // hindi ang badge na mag-overflow
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              name,
-              style: GoogleFonts.poppins(
-                fontSize: nameFontSize,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
+            Expanded(
+              child: Text(
+                name,
+                style: GoogleFonts.poppins(
+                  fontSize: nameFontSize,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(width: 10),
             StatusBadge(label: role, color: roleColor),
@@ -189,20 +178,26 @@ class AccountCard extends StatelessWidget {
 
         const SizedBox(height: 8),
 
-        // ── Row 2: Date (left) ──── Status + Edit (right, magkatabi) ──
+        // ── Row 2: Date (left) ──── Status + Edit (right) ──
+        // Date row ay nasa Expanded — Spacer works properly,
+        // at Status + Edit ay hindi na mag-overflow
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Date left
-            Icon(Icons.calendar_today, size: isTablet ? 16 : 14, color: Colors.grey.shade500),
-            const SizedBox(width: 6),
-            Text(
-              date,
-              style: GoogleFonts.poppins(fontSize: dateFontSize, color: Colors.grey.shade500),
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today, size: isTablet ? 16 : 14, color: Colors.grey.shade500),
+                  const SizedBox(width: 6),
+                  Text(
+                    date,
+                    style: GoogleFonts.poppins(fontSize: dateFontSize, color: Colors.grey.shade500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-
-            // Push to right
-            const Spacer(),
 
             // Status badge + Edit button side by side
             StatusBadge(
