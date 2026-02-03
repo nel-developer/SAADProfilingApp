@@ -180,13 +180,21 @@ class _RegisterScreenState extends State<RegisterScreen>
     setState(() => _isLoading = true);
 
     try {
-      await _authService.registerWithEmailPassword(
-        email: email,
-        password: password,
-        firstName: firstName,
-        middleName: middleName,
-        lastName: lastName,
-      );
+      // Use timeout to avoid long Firestore writes blocking the UI
+      // If write times out after 1 second, still navigate (write continues in background)
+      await _authService
+          .registerWithEmailPassword(
+            email: email,
+            password: password,
+            firstName: firstName,
+            middleName: middleName,
+            lastName: lastName,
+          )
+          .timeout(const Duration(milliseconds: 1000), onTimeout: () {
+        // Timeout — still move to account under review
+        // (Firestore write continues in background)
+        return null;
+      });
 
       if (mounted) {
         Navigator.pushReplacementNamed(

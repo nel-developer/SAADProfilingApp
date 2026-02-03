@@ -114,8 +114,7 @@ class _HomeScreenState extends State<HomeScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Restricted'),
-        content: const Text(
-            'This feature is restricted. Only Admins, Profilers, or Moderators can access it.'),
+        content: const Text('You do not have access.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
