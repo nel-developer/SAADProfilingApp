@@ -99,9 +99,12 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadUserRole() async {
     final user = _authService.currentUser;
     if (user != null) {
-      final userData = await _authService.getUserData(user.uid);
+      // Use `getUserRole` which checks in-memory and SharedPreferences caches
+      // before querying Firestore. This is faster and avoids fetching full
+      // user documents just to read the role.
+      final role = await _authService.getUserRole(user.uid);
       setState(() {
-        _userRole = userData?['role'] as String?;
+        _userRole = role;
       });
     }
   }
@@ -110,9 +113,9 @@ class _HomeScreenState extends State<HomeScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Admin Only'),
-        content:
-            const Text('This feature is only available to administrators.'),
+        title: const Text('Restricted'),
+        content: const Text(
+            'This feature is restricted. Only Admins, Profilers, or Moderators can access it.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -266,8 +269,12 @@ class _HomeScreenState extends State<HomeScreen>
                           child: HomeTile(
                             label: 'Profiling',
                             icon: Icons.person_outline,
-                            route: AppRoutes.profiling,
-                            animation: _tile2Anim,
+                              route: AppRoutes.profiling,
+                              animation: _tile2Anim,
+                              isEnabled: _userRole != null &&
+                                  ['admin', 'profiler', 'moderator']
+                                      .contains(_userRole!.toLowerCase()),
+                              onDisabledTap: _showLockedAlert,
                           ),
                         ),
                       ],

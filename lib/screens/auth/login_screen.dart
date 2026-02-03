@@ -154,8 +154,11 @@ class _LoginScreenState extends State<LoginScreen>
           // ignore: unawaited_futures
           _authService.getUserData(uid);
         } else {
-          // No cached data — fetch with retry/backoff (added in service)
-          final userData = await _authService.getUserData(uid);
+          // No cached data — fetch but don't block the UI for long.
+          // Use a short timeout so slow Firestore doesn't delay navigation.
+          final userData = await _authService
+              .getUserData(uid)
+              .timeout(const Duration(milliseconds: 800), onTimeout: () => null);
           accountStatus = userData?['accountStatus'];
 
           if (accountStatus == 'pending_review') {
