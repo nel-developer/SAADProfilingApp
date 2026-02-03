@@ -110,19 +110,19 @@ class _HomeScreenState extends State<HomeScreen>
     // HEADER HEIGHT
     final headerHeight = height * (isLargeTablet ? 0.18 : isTablet ? 0.22 : 0.28);
     
-    // TEXT SIZE - LUMALAKI SA TABLET! ⬆️⬆️⬆️
+    // TEXT SIZE
     final welcomeFontSize = isLargeTablet 
-        ? 48.0  // Large tablet: 48px - MAS MALAKI! 🔥
+        ? 48.0
         : isTablet 
-            ? 38.0  // Tablet: 38px - BIGGER! ⬆️
-            : width * 0.065; // Phone: 6.5% of width
+            ? 38.0
+            : width * 0.065;
     
-    // AVATAR SIZE - LUMALAKI SA TABLET! ⬆️⬆️⬆️
+    // AVATAR SIZE
     final avatarRadius = isLargeTablet
-        ? 55.0  // Large tablet: 55px radius - MAS MALAKI! 🔥
+        ? 55.0
         : isTablet
-            ? 45.0  // Tablet: 45px radius - BIGGER! ⬆️
-            : width * 0.085; // Phone: 8.5% of width
+            ? 45.0
+            : width * 0.085;
 
     // TILES SIZING
     final tileGridPadding = isLargeTablet
@@ -162,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen>
                   customHeight: headerHeight,
                 ),
 
-                /// HEADER CONTENT (Text + Avatar) - RESPONSIVE!
+                /// HEADER CONTENT (Text + Avatar)
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
@@ -183,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen>
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                /// WELCOME TEXT - LUMALAKI SA TABLET!
+                                /// WELCOME TEXT
                                 Flexible(
                                   flex: 3,
                                   child: Text.rich(
@@ -218,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                                 SizedBox(width: width * 0.04),
 
-                                /// AVATAR - LUMALAKI SA TABLET!
+                                /// AVATAR
                                 CircleAvatar(
                                   radius: avatarRadius,
                                   backgroundColor: Colors.white,
@@ -284,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen>
                               child: HomeTile(
                                 label: 'Profiling',
                                 icon: Icons.person_outline,
-                                route: null,
+                                route: AppRoutes.profiling, // ← FIXED: may route na
                                 animation: _tile2Anim,
                               ),
                             ),

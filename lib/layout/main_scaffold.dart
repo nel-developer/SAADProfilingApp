@@ -17,6 +17,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   final List<Widget> _screens = const [
     HomeScreen(),
     DataScreen(),
+    SizedBox.shrink(),
   ];
 
   void _onItemTapped(int index) {

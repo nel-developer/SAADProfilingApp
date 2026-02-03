@@ -6,6 +6,7 @@ import 'package:da_project_1/screens/auth/account_under_review_screen.dart';
 import 'package:da_project_1/screens/dashboard/dashboard_screen.dart';
 import 'package:da_project_1/screens/accounts/accounts_screen.dart';
 import 'package:da_project_1/screens/settings/settings_screen.dart';
+import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart'; // ← ProfilingFlow is here now!
 
 class AppRoutes {
   static const String splash = '/splash';
@@ -16,6 +17,7 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String accounts = '/accounts';
   static const String settings = '/settings';
+  static const String profiling = '/profiling';
 
   static Map<String, WidgetBuilder> getRoutes() {
     return {
@@ -26,6 +28,7 @@ class AppRoutes {
       dashboard: (_) => const DashboardScreen(),
       accounts: (_) => const AccountsScreen(),
       settings: (_) => const SettingsScreen(),
+      profiling: (_) => const ProfilingFlow(), // ← Uses ProfilingFlow from profiling_step_wrapper.dart
     };
   }
 }
