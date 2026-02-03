@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FirebaseAuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final Map<String, String> _roleCache = {}; // in-memory cache: uid -> role
 
   /// Get current user
   User? get currentUser => _firebaseAuth.currentUser;
@@ -34,7 +37,8 @@ class FirebaseAuthService {
         'createdAt': FieldValue.serverTimestamp(),
         'accountStatus': 'pending_review', // Default status
         'role': 'user', // Default role - will be updated on approval
-        'roles': [], // List of roles: 'admin', 'moderator', 'profiler'
+        // Do not create a separate 'roles' array on registration to avoid
+        // redundant fields. Use single 'role' field as canonical source.
       });
 
       return userCredential;
@@ -79,11 +83,46 @@ class FirebaseAuthService {
   /// Get user data from Firestore
   Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
-      return doc.data() as Map<String, dynamic>?;
+      // Try reading with simple retry/backoff in case of transient errors
+      final doc = await _withRetry<DocumentSnapshot>(() =>
+          _firestore.collection('users').doc(uid).get());
+
+      final data = doc.data() as Map<String, dynamic>?;
+
+      // Cache primary role if present
+      final role = data?['role'] as String?;
+      if (role != null && role.isNotEmpty) {
+        _roleCache[uid] = role;
+        _saveRoleToPrefs(uid, role);
+      }
+
+      // Cache minimal userData (role + accountStatus) to speed up login routing
+      if (data != null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final minimal = <String, dynamic>{};
+          if (data.containsKey('role')) minimal['role'] = data['role'];
+          if (data.containsKey('accountStatus')) minimal['accountStatus'] = data['accountStatus'];
+          await prefs.setString('user_data_$uid', jsonEncode(minimal));
+        } catch (_) {}
+      }
+
+      return data;
     } catch (e) {
       rethrow;
+    }
+  }
+
+  /// Return cached minimal userData (role + accountStatus) if present
+  Future<Map<String, dynamic>?> getCachedUserData(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('user_data_$uid');
+      if (raw == null) return null;
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -149,6 +188,15 @@ class FirebaseAuthService {
       final userDoc = await _firestore.collection('users').doc(uid).get();
       List<String> roles = List<String>.from(userDoc['roles'] ?? []);
 
+      // If the legacy/array `roles` is missing but a primary `role` exists,
+      // seed the list so we preserve prior role information.
+      if (roles.isEmpty) {
+        final primary = userDoc['role'] as String?;
+        if (primary != null && primary.isNotEmpty) {
+          roles.add(primary);
+        }
+      }
+
       // Add role if not already present
       if (!roles.contains(role)) {
         roles.add(role);
@@ -207,11 +255,57 @@ class FirebaseAuthService {
 
   /// Get user role
   Future<String?> getUserRole(String uid) async {
+    // 1) Check in-memory cache
+    if (_roleCache.containsKey(uid)) return _roleCache[uid];
+
+    // 2) Check SharedPreferences cache
     try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-      return doc['role'] as String?;
-    } catch (e) {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('user_role_$uid');
+      if (cached != null && cached.isNotEmpty) {
+        _roleCache[uid] = cached;
+        return cached;
+      }
+    } catch (_) {}
+
+    // 3) Fetch from Firestore with retry/backoff
+    try {
+      final doc = await _withRetry<DocumentSnapshot>(
+          () => _firestore.collection('users').doc(uid).get());
+      final role = doc['role'] as String?;
+      if (role != null && role.isNotEmpty) {
+        _roleCache[uid] = role;
+        _saveRoleToPrefs(uid, role);
+        return role;
+      }
       return null;
+    } catch (e) {
+      // Firestore unavailable — return null so callers can fallback gracefully
+      return null;
+    }
+  }
+
+  Future<void> _saveRoleToPrefs(String uid, String role) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_role_$uid', role);
+    } catch (_) {}
+  }
+
+  /// Utility: run a future with simple exponential backoff retries
+  Future<T> _withRetry<T>(Future<T> Function() fn,
+      {int retries = 3, int initialDelayMs = 300}) async {
+    int attempt = 0;
+    int delayMs = initialDelayMs;
+    while (true) {
+      try {
+        return await fn();
+      } catch (e) {
+        attempt++;
+        if (attempt > retries) rethrow;
+        await Future.delayed(Duration(milliseconds: delayMs));
+        delayMs *= 2;
+      }
     }
   }
 
@@ -219,9 +313,28 @@ class FirebaseAuthService {
   Future<List<String>> getUserRoles(String uid) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
-      return List<String>.from(doc['roles'] ?? []);
+      final roles = List<String>.from(doc['roles'] ?? []);
+      if (roles.isNotEmpty) return roles;
+
+      // Fallback to single `role` field if `roles` array is not present.
+      final primary = doc['role'] as String?;
+      if (primary != null && primary.isNotEmpty) return [primary];
+
+      return [];
     } catch (e) {
       return [];
+    }
+  }
+
+  /// Update user role (for already approved accounts)
+  Future<void> updateUserRole(String uid, String newRole) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'role': newRole,
+        'roleUpdatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to update user role: $e');
     }
   }
 }
