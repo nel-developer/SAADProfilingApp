@@ -5,8 +5,10 @@ import 'package:da_project_1/widgets/green_header_section.dart';
 import 'package:da_project_1/widgets/stepper_header.dart';
 import 'package:da_project_1/screens/profiling/step_01_personal_info.dart';
 import 'package:da_project_1/screens/profiling/step_02_address_info.dart';
+import 'package:da_project_1/screens/profiling/step_03_other_personal.dart';
+import 'package:da_project_1/screens/profiling/step_04_main_commodity.dart';
 // Import other steps as you create them
-// import 'package:da_project_1/screens/profiling/step_03_other_personal.dart';
+// import 'package:da_project_1/screens/profiling/step_05_recurrence.dart';
 // etc...
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -82,9 +84,23 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
           onHeaderBack: _goToHome,
         );
       
+      case 3:
+        return Step03OtherPersonal(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+      
+      case 4:
+        return Step04MainCommodity(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+      
       // Add other steps as you create them
-      // case 3:
-      //   return Step03OtherPersonal(
+      // case 5:
+      //   return Step04MainCommodity(
       //     onNext: _goToNextStep,
       //     onBack: _goToPreviousStep,
       //     onHeaderBack: _goToHome,
@@ -289,10 +305,10 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               child: Theme(
                 data: Theme.of(context).copyWith(
                   scrollbarTheme: ScrollbarThemeData(
-                    thumbColor: WidgetStateProperty.all(
+                    thumbColor: MaterialStateProperty.all(
                       DAColors.primaryGreen.withOpacity(0.5), // ← Light green!
                     ),
-                    thickness: WidgetStateProperty.all(4.0),
+                    thickness: MaterialStateProperty.all(4.0),
                     radius: const Radius.circular(8),
                   ),
                 ),
