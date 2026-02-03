@@ -272,8 +272,8 @@ class _HomeScreenState extends State<HomeScreen>
                               route: AppRoutes.profiling,
                               animation: _tile2Anim,
                               isEnabled: _userRole != null &&
-                                  ['admin', 'profiler', 'moderator']
-                                      .contains(_userRole!.toLowerCase()),
+                                ['admin', 'profiler']
+                                  .contains(_userRole!.toLowerCase()),
                               onDisabledTap: _showLockedAlert,
                           ),
                         ),
