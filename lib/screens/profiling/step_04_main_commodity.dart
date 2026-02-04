@@ -233,7 +233,7 @@ class _Step04MainCommodityState extends State<Step04MainCommodity> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(

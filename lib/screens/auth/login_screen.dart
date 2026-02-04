@@ -466,7 +466,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   );
                                 }, minimumSize: Size(0, 0),
                                 child: Text(
-                                  '[TEST] Go to Under Review',
+                                  'Forgot Password?',
                                   style: GoogleFonts.poppins(
                                     fontSize: testFontSize,
                                     color: Colors.white54,
