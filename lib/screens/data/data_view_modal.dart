@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/screens/data/data_edit_modal.dart';
 
-class DataViewModal extends StatelessWidget {
+class DataViewModal extends StatefulWidget {
   final Map<String, dynamic> profileData;
   final String userRole;
   final String dataStatus;
@@ -27,11 +27,46 @@ class DataViewModal extends StatelessWidget {
     this.onDecline,
   });
 
+  @override
+  State<DataViewModal> createState() => _DataViewModalState();
+}
+
+class _DataViewModalState extends State<DataViewModal> {
+  // Track which years are expanded
+  final Map<int, bool> _expandedYears = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize: all years collapsed by default
+    final years = _getRelevantYears();
+    for (var year in years) {
+      _expandedYears[year] = false;
+    }
+  }
+
+  // Get last 3 years + current year (4 years total)
+  List<int> _getRelevantYears() {
+    final currentYear = DateTime.now().year;
+    return [
+      currentYear - 3,
+      currentYear - 2,
+      currentYear - 1,
+      currentYear,
+    ];
+  }
+
+  void _toggleYear(int year) {
+    setState(() {
+      _expandedYears[year] = !(_expandedYears[year] ?? false);
+    });
+  }
+
   double _scale(BuildContext context) {
     final scaleW =
-        (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
+        (MediaQuery.of(context).size.width / DataViewModal._refWidth).clamp(0.5, 2.0);
     final scaleH =
-        (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+        (MediaQuery.of(context).size.height / DataViewModal._refHeight).clamp(0.5, 2.0);
     return min(scaleW, scaleH);
   }
 
@@ -40,7 +75,7 @@ class DataViewModal extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => DataEditModal(
-          profileData: profileData,
+          profileData: widget.profileData,
           onSave: (updatedData) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -289,8 +324,8 @@ class DataViewModal extends StatelessWidget {
 
                     SizedBox(height: 16 * scale),
                     _buildSectionTitle('Recurrence', sectionTitleFontSize, scale),
-                    _buildRecurrenceYear('2025', labelFontSize, valueFontSize, scale),
-                    _buildRecurrenceYear('2026', labelFontSize, valueFontSize, scale, isExpanded: true),
+                    // DYNAMIC YEAR DROPDOWNS (last 3 years + current year, descending)
+                    ..._buildRecurrenceYearsList(labelFontSize, valueFontSize, scale),
 
                     SizedBox(height: 16 * scale),
                     _buildSectionTitle(
@@ -343,7 +378,28 @@ class DataViewModal extends StatelessWidget {
   }
 
   bool _shouldShowButtons() {
-    return dataStatus == 'Unsync' || dataStatus == 'Pending' || dataStatus == 'Approved';
+    return widget.dataStatus == 'Unsync' || 
+           widget.dataStatus == 'Pending' || 
+           widget.dataStatus == 'Approved';
+  }
+
+  // Build the list of recurrence year dropdowns (descending order)
+  List<Widget> _buildRecurrenceYearsList(double labelSize, double valueSize, double scale) {
+    final years = _getRelevantYears()..sort((a, b) => b.compareTo(a)); // descending
+    
+    return years.map((year) {
+      final isExpanded = _expandedYears[year] ?? false;
+      return GestureDetector(
+        onTap: () => _toggleYear(year),
+        child: _buildRecurrenceYear(
+          year.toString(),
+          labelSize,
+          valueSize,
+          scale,
+          isExpanded: isExpanded,
+        ),
+      );
+    }).toList();
   }
 
   Widget _buildSectionTitle(String title, double fontSize, double scale) {
@@ -482,10 +538,12 @@ class DataViewModal extends StatelessWidget {
             padding: EdgeInsets.all(12 * scale),
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(8 * scale),
-                topRight: Radius.circular(8 * scale),
-              ),
+              borderRadius: isExpanded
+                  ? BorderRadius.only(
+                      topLeft: Radius.circular(8 * scale),
+                      topRight: Radius.circular(8 * scale),
+                    )
+                  : BorderRadius.circular(8 * scale),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -511,7 +569,7 @@ class DataViewModal extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Year Covered: 2026', style: GoogleFonts.poppins(fontSize: labelSize)),
+                  Text('Year Covered: $year', style: GoogleFonts.poppins(fontSize: labelSize)),
                   SizedBox(height: 8 * scale),
                   _buildInfoRow(
                     'Received Primary Commodity:',
@@ -669,7 +727,7 @@ class DataViewModal extends StatelessWidget {
 
   Widget _buildBottomButtons(BuildContext context, double buttonHeight, double buttonFontSize, double buttonSpacing) {
     // UNSYNC: Edit + Sync
-    if (dataStatus == 'Unsync') {
+    if (widget.dataStatus == 'Unsync') {
       return Row(
         children: [
           Expanded(
@@ -686,7 +744,7 @@ class DataViewModal extends StatelessWidget {
             child: _buildButton(
               'Sync',
               DAColors.primaryGreen,
-              onSync ?? () {},
+              widget.onSync ?? () {},
               buttonHeight,
               buttonFontSize,
             ),
@@ -696,14 +754,14 @@ class DataViewModal extends StatelessWidget {
     }
 
     // PENDING: Approve + Edit + Decline
-    if (dataStatus == 'Pending') {
+    if (widget.dataStatus == 'Pending') {
       return Row(
         children: [
           Expanded(
             child: _buildButton(
               'Approve',
               DAColors.primaryGreen,
-              onApprove ?? () {},
+              widget.onApprove ?? () {},
               buttonHeight,
               buttonFontSize,
             ),
@@ -723,7 +781,7 @@ class DataViewModal extends StatelessWidget {
             child: _buildButton(
               'Decline',
               DAColors.red,
-              onDecline ?? () {},
+              widget.onDecline ?? () {},
               buttonHeight,
               buttonFontSize,
             ),
