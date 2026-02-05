@@ -25,7 +25,6 @@ class Step03OtherPersonal extends StatefulWidget {
 class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
   bool? _isIndigenous;
   bool? _isPWD;
-  String? _selectedIndigenousGroup;
   final TextEditingController _spouseNameCtrl = TextEditingController();
 
   final List<String> _indigenousGroups = [
