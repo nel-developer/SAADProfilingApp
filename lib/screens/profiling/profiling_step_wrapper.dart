@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
@@ -5,9 +6,12 @@ import 'package:da_project_1/widgets/green_header_section.dart';
 import 'package:da_project_1/widgets/stepper_header.dart';
 import 'package:da_project_1/screens/profiling/step_01_personal_info.dart';
 import 'package:da_project_1/screens/profiling/step_02_address_info.dart';
-// Import other steps as you create them
-// import 'package:da_project_1/screens/profiling/step_03_other_personal.dart';
-// etc...
+import 'package:da_project_1/screens/profiling/step_03_other_personal.dart';
+import 'package:da_project_1/screens/profiling/step_04_main_commodity.dart';
+import 'package:da_project_1/screens/profiling/step_05_recurrence.dart';
+import 'package:da_project_1/screens/profiling/step_06_monthly_income.dart';
+import 'package:da_project_1/screens/profiling/step_07_farm_income.dart';
+import 'package:da_project_1/screens/profiling/step_08_signature.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROFILING FLOW - Main Entry Point
@@ -74,22 +78,56 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
           onNext: _goToNextStep,
           onHeaderBack: _goToHome,
         );
-      
+
       case 2:
         return Step02AddressInfo(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
         );
-      
-      // Add other steps as you create them
-      // case 3:
-      //   return Step03OtherPersonal(
-      //     onNext: _goToNextStep,
-      //     onBack: _goToPreviousStep,
-      //     onHeaderBack: _goToHome,
-      //   );
-      
+
+      case 3:
+        return Step03OtherPersonal(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+
+      case 4:
+        return Step04MainCommodity(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+
+      case 5:
+        return Step05Recurrence(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+
+      case 6:
+        return Step06MonthlyIncome(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+
+      case 7:
+        return Step07FarmIncome(
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+
+      case 8:
+        return Step08Signature(
+          onNext: _submitForm, // Final step — submits form
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+        );
+
       default:
         return Step01PersonalInfo(
           onNext: _goToNextStep,
@@ -141,20 +179,60 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
   late AnimationController _ctrl;
   late Animation<double> _fadeAnim;
   late Animation<double> _slideAnim;
+  late Animation<double> _headerOpacityAnim;
+  late Animation<double> _headerSlideAnim;
+  late Animation<double> _leafLeftAnim;
+  late Animation<double> _leafRightAnim;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 1200),
     );
+
+    // Header animations (like AccountsScreen)
+    _headerOpacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _headerSlideAnim = Tween<double>(begin: -40.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _leafLeftAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _leafRightAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _ctrl,
+        curve: const Interval(0.1, 0.6, curve: Curves.easeOut),
+      ),
+    );
+
+    // Form body animations
     _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.8, curve: Curves.easeOut)),
+      CurvedAnimation(
+          parent: _ctrl,
+          curve: const Interval(0.3, 0.9, curve: Curves.easeOut)),
     );
     _slideAnim = Tween<double>(begin: 30.0, end: 0.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.9, curve: Curves.easeOut)),
+      CurvedAnimation(
+          parent: _ctrl,
+          curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
     );
+
     _ctrl.forward();
   }
 
@@ -170,23 +248,26 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
     final width = size.width;
     final height = size.height;
 
+    // Responsive breakpoints
     final isTablet = width > 600;
     final isLargeTablet = width > 900;
 
-    // ── header ──
-    final double headerHeight = height * (isLargeTablet ? 0.22 : isTablet ? 0.25 : 0.30);
-    final double titleFontSize = isLargeTablet ? 42.0 : isTablet ? 34.0 : width * 0.075;
-    final double subtitleFontSize = isLargeTablet ? 16.0 : isTablet ? 14.0 : width * 0.035;
+    // Header sizing
+    final headerHeight = height * (isLargeTablet ? 0.18 : isTablet ? 0.22 : 0.28);
+    final titleFontSize = isLargeTablet ? 36.0 : isTablet ? 30.0 : width * 0.065;
+    final subtitleFontSize = isLargeTablet ? 14.0 : isTablet ? 12.0 : width * 0.03;
+    final backButtonSize = isTablet ? 28.0 : 24.0;
 
-    // ── body ──
-    final double contentHPad = isLargeTablet ? 48.0 : isTablet ? 32.0 : width * 0.055;
-    final double sectionTitleSize = isLargeTablet ? 24.0 : isTablet ? 20.0 : 18.0;
+    // Content sizing
+    final contentHPad = width * 0.06;
+    final sectionTitleSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
+    final sectionSpacing = isTablet ? 18.0 : 14.0;
 
-    // ── bottom ──
-    final double bottomPad = isLargeTablet ? 36.0 : isTablet ? 28.0 : 24.0;
-    final double nextHeight = isLargeTablet ? 58.0 : isTablet ? 52.0 : 50.0;
-    final double nextFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
-    final double nextRadius = isLargeTablet ? 30.0 : isTablet ? 28.0 : 26.0;
+    // Bottom buttons
+    final bottomPad = isTablet ? 28.0 : 24.0;
+    final nextHeight = isLargeTablet ? 56.0 : isTablet ? 52.0 : 50.0;
+    final nextFontSize = isLargeTablet ? 18.0 : isTablet ? 17.0 : 16.0;
+    final backFontSize = isLargeTablet ? 15.0 : isTablet ? 14.0 : 13.0;
 
     return Scaffold(
       backgroundColor: DAColors.lightGrey,
@@ -199,64 +280,96 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
             height: headerHeight,
             child: Stack(
               children: [
-                GreenHeaderSection(customHeight: headerHeight),
-
-                // Back arrow - positioned at TOP LEFT, overlapping header
-                Positioned(
-                  left: contentHPad,
-                  top: isLargeTablet ? 32.0 : isTablet ? 26.0 : 22.0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: GestureDetector(
-                      onTap: widget.onHeaderBack ?? () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(12), // ← Padding inside circle
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9), // ← Slight transparency
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.12),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.arrow_back,
-                          color: DAColors.primaryGreen,
-                          size: isLargeTablet ? 28 : isTablet ? 24 : 22, // ← Responsive icon size
-                        ),
-                      ),
-                    ),
-                  ),
+                GreenHeaderSection(
+                  leafLeftAnimation: _leafLeftAnim,
+                  leafRightAnimation: _leafRightAnim,
+                  customHeight: headerHeight,
                 ),
 
-                // Title + subtitle - centered
-                Positioned.fill(
-                  child: SafeArea(
-                    bottom: false,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                // HEADER CONTENT with animations
+                AnimatedBuilder(
+                  animation: _ctrl,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _headerOpacityAnim.value.clamp(0.0, 1.0),
+                      child: Transform.translate(
+                        offset: Offset(0, _headerSlideAnim.value),
+                        child: child!,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    height: headerHeight,
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: width * 0.06,
+                      vertical: height * 0.025,
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Row(
                         children: [
-                          Text(
-                            'Profiling',
-                            style: GoogleFonts.poppins(
-                              fontSize: titleFontSize,
-                              fontWeight: FontWeight.w800,
-                              color: DAColors.white,
+                          /// BACK BUTTON
+                          GestureDetector(
+                            onTap: widget.onHeaderBack ??
+                                () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.arrow_back,
+                                color: DAColors.primaryGreen,
+                                size: backButtonSize,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Farmers/Fisherfolks Profiling Form',
-                            style: GoogleFonts.poppins(
-                              fontSize: subtitleFontSize,
-                              fontWeight: FontWeight.w400,
-                              color: DAColors.white.withOpacity(0.88),
+
+                          const Spacer(),
+
+                          /// TITLE & SUBTITLE (CENTERED)
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Profiling',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: titleFontSize,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    height: 1.2,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.visible,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Farmers/Fisherfolks Profiling Form',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: subtitleFontSize,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.white.withOpacity(0.9),
+                                    height: 1.3,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ],
                             ),
                           ),
+
+                          const Spacer(),
+
+                          /// INVISIBLE SPACER FOR CENTERING
+                          SizedBox(width: isTablet ? 52 : 48),
                         ],
                       ),
                     ),
@@ -289,15 +402,15 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               child: Theme(
                 data: Theme.of(context).copyWith(
                   scrollbarTheme: ScrollbarThemeData(
-                    thumbColor: WidgetStateProperty.all(
-                      DAColors.primaryGreen.withOpacity(0.5), // ← Light green!
+                    thumbColor: MaterialStateProperty.all(
+                      DAColors.primaryGreen.withOpacity(0.5),
                     ),
-                    thickness: WidgetStateProperty.all(4.0),
+                    thickness: MaterialStateProperty.all(4.0),
                     radius: const Radius.circular(8),
                   ),
                 ),
                 child: Scrollbar(
-                  thumbVisibility: true, // ← Always show scrollbar
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: EdgeInsets.symmetric(horizontal: contentHPad),
@@ -313,7 +426,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                             color: DAColors.black,
                           ),
                         ),
-                        SizedBox(height: isLargeTablet ? 20.0 : 16.0),
+                        SizedBox(height: sectionSpacing),
 
                         // form fields (child)
                         widget.child,
@@ -332,7 +445,12 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
           // ==============================================================
           Container(
             color: DAColors.lightGrey,
-            padding: EdgeInsets.fromLTRB(contentHPad, 12.0, contentHPad, bottomPad),
+            padding: EdgeInsets.fromLTRB(
+              contentHPad,
+              12.0,
+              contentHPad,
+              bottomPad,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -344,7 +462,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                     height: nextHeight,
                     decoration: BoxDecoration(
                       color: DAColors.orange,
-                      borderRadius: BorderRadius.circular(nextRadius),
+                      borderRadius: BorderRadius.circular(26),
                       boxShadow: [
                         BoxShadow(
                           color: DAColors.orange.withOpacity(0.40),
@@ -373,11 +491,14 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                     child: GestureDetector(
                       onTap: widget.onBack,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 24),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 24,
+                        ),
                         child: Text(
                           'Back',
                           style: GoogleFonts.poppins(
-                            fontSize: isLargeTablet ? 15.0 : 14.0,
+                            fontSize: backFontSize,
                             fontWeight: FontWeight.w500,
                             color: Colors.grey.shade500,
                           ),
