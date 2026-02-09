@@ -325,32 +325,8 @@ class _DataViewModalState extends State<DataViewModal> {
                     SizedBox(height: 16 * scale),
                     _buildSectionTitle('Recurrence', sectionTitleFontSize, scale),
                     // DYNAMIC YEAR DROPDOWNS (last 3 years + current year, descending)
+                    // NOW INCLUDES MONTHLY INCOME INSIDE EACH YEAR
                     ..._buildRecurrenceYearsList(labelFontSize, valueFontSize, scale),
-
-                    SizedBox(height: 16 * scale),
-                    _buildSectionTitle(
-                      'Monthly Family Income',
-                      sectionTitleFontSize,
-                      scale,
-                    ),
-                    _buildInfoRow(
-                      'Derived from Agri-Related Activities(Gross)',
-                      '₱25,000',
-                      'SAAD Net Income',
-                      '₱25,000',
-                      labelFontSize,
-                      valueFontSize,
-                      scale,
-                    ),
-                    _buildInfoRow(
-                      'Derived from Non Agri-Related Activities(Gross)',
-                      '₱25,000',
-                      'Main Sources of Income',
-                      '₱25,000',
-                      labelFontSize,
-                      valueFontSize,
-                      scale,
-                    ),
 
                     SizedBox(height: 16 * scale),
                     _buildSectionTitle(
@@ -608,6 +584,47 @@ class _DataViewModalState extends State<DataViewModal> {
                   Text(
                     'No of Years Fishing/Farming: 5',
                     style: GoogleFonts.poppins(fontSize: labelSize),
+                  ),
+                  
+                  SizedBox(height: 12 * scale),
+                  
+                  // ═══ MONTHLY FAMILY INCOME (NOW INSIDE RECURRENCE) ═══
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: 6 * scale),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(6 * scale),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Monthly Family Income',
+                        style: GoogleFonts.poppins(
+                          fontSize: labelSize,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildInfoRow(
+                    'Derived from Agri-Related Activities(Gross)',
+                    '₱25,000',
+                    'SAAD Net Income',
+                    '₱25,000',
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  _buildInfoRow(
+                    'Derived from Non Agri-Related Activities(Gross)',
+                    '₱25,000',
+                    'Main Sources of Income',
+                    '₱25,000',
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
                   ),
                 ],
               ),

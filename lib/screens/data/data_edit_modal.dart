@@ -56,7 +56,18 @@ class _DataEditModalState extends State<DataEditModal> {
   final TextEditingController _dateMembershipController = TextEditingController();
   final TextEditingController _positionSpecifyController = TextEditingController();
 
-  // Monthly Income Controllers
+  // Recurrence Controllers (Current Year)
+  final TextEditingController _recPrimaryController = TextEditingController();
+  final TextEditingController _recSecondaryController = TextEditingController();
+  final TextEditingController _recPrimarySpecifyController = TextEditingController();
+  final TextEditingController _recSecondarySpecifyController = TextEditingController();
+  final TextEditingController _familyMaleController = TextEditingController();
+  final TextEditingController _familyFemaleController = TextEditingController();
+  final TextEditingController _landTenureshipController = TextEditingController();
+  final TextEditingController _landTenureshipSpecifyController = TextEditingController();
+  final TextEditingController _yearsFishingController = TextEditingController();
+
+  // Monthly Income Controllers (inside Recurrence)
   final TextEditingController _agriRelatedController = TextEditingController();
   final TextEditingController _saadNetIncomeController = TextEditingController();
   final TextEditingController _nonAgriRelatedController = TextEditingController();
@@ -102,6 +113,18 @@ class _DataEditModalState extends State<DataEditModal> {
     _dateMembershipController.text = '11/12/25';
     _positionSpecifyController.text = '___________';
 
+    // Recurrence data (current year)
+    _recPrimaryController.text = 'Others';
+    _recSecondaryController.text = 'Others';
+    _recPrimarySpecifyController.text = '___________';
+    _recSecondarySpecifyController.text = '___________';
+    _familyMaleController.text = '2';
+    _familyFemaleController.text = '2';
+    _landTenureshipController.text = 'Others';
+    _landTenureshipSpecifyController.text = '___________';
+    _yearsFishingController.text = '5';
+
+    // Monthly Income (inside recurrence)
     _agriRelatedController.text = '₱25,000';
     _saadNetIncomeController.text = '₱25,000';
     _nonAgriRelatedController.text = '₱25,000';
@@ -139,6 +162,15 @@ class _DataEditModalState extends State<DataEditModal> {
     _positionController.dispose();
     _dateMembershipController.dispose();
     _positionSpecifyController.dispose();
+    _recPrimaryController.dispose();
+    _recSecondaryController.dispose();
+    _recPrimarySpecifyController.dispose();
+    _recSecondarySpecifyController.dispose();
+    _familyMaleController.dispose();
+    _familyFemaleController.dispose();
+    _landTenureshipController.dispose();
+    _landTenureshipSpecifyController.dispose();
+    _yearsFishingController.dispose();
     _agriRelatedController.dispose();
     _saadNetIncomeController.dispose();
     _nonAgriRelatedController.dispose();
@@ -391,7 +423,90 @@ class _DataEditModalState extends State<DataEditModal> {
                     ),
 
                     SizedBox(height: 20 * scale),
-                    _buildSectionTitle('Monthly Family Income', sectionTitleFontSize, scale),
+                    _buildSectionTitle('Recurrence (Current Year)', sectionTitleFontSize, scale),
+                    SizedBox(height: 12 * scale),
+                    
+                    // Year display (non-editable, shows current year)
+                    Container(
+                      padding: EdgeInsets.all(12 * scale),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12 * scale),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Year Covered: ${DateTime.now().year}',
+                        style: GoogleFonts.poppins(
+                          fontSize: labelFontSize,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12 * scale),
+                    
+                    _buildEditRow(
+                      'Received Primary Commodity',
+                      _recPrimaryController,
+                      'Received Secondary Commodity',
+                      _recSecondaryController,
+                      labelFontSize,
+                      scale,
+                    ),
+                    SizedBox(height: 12 * scale),
+                    _buildEditRow(
+                      'If yes, specify Primary',
+                      _recPrimarySpecifyController,
+                      'If yes, specify Secondary',
+                      _recSecondarySpecifyController,
+                      labelFontSize,
+                      scale,
+                    ),
+                    SizedBox(height: 12 * scale),
+                    _buildEditRow(
+                      'No. of Family Members (Male)',
+                      _familyMaleController,
+                      'No. of Family Members (Female)',
+                      _familyFemaleController,
+                      labelFontSize,
+                      scale,
+                    ),
+                    SizedBox(height: 12 * scale),
+                    _buildEditRow(
+                      'Land Tenureship',
+                      _landTenureshipController,
+                      'If yes, please specify',
+                      _landTenureshipSpecifyController,
+                      labelFontSize,
+                      scale,
+                    ),
+                    SizedBox(height: 12 * scale),
+                    _buildSingleEditField(
+                      'No. of Years Fishing/Farming',
+                      _yearsFishingController,
+                      labelFontSize,
+                      scale,
+                    ),
+
+                    SizedBox(height: 16 * scale),
+                    // Monthly Income subsection header
+                    Container(
+                      padding: EdgeInsets.symmetric(vertical: 8 * scale),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8 * scale),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Monthly Family Income',
+                          style: GoogleFonts.poppins(
+                            fontSize: labelFontSize + 1 * scale,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
                     SizedBox(height: 12 * scale),
                     _buildEditRow(
                       'Derived from Agri-Related Activities(Gross)',
