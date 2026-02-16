@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class FirebaseSyncService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -24,9 +25,9 @@ class FirebaseSyncService {
         'accountStatus': 'pending_review',
         'createdAt': FieldValue.serverTimestamp(),
       });
-      print('User synced to Firestore: ${authUser.uid}');
+      debugPrint('User synced to Firestore: ${authUser.uid}');
     } catch (e) {
-      print('Error syncing user: $e');
+      debugPrint('Error syncing user: $e');
       rethrow;
     }
   }
@@ -45,7 +46,7 @@ class FirebaseSyncService {
       }
       return null;
     } catch (e) {
-      print('Error fetching user by email: $e');
+      debugPrint('Error fetching user by email: $e');
       return null;
     }
   }
@@ -70,7 +71,7 @@ class FirebaseSyncService {
       // Return empty list - auth user listing requires Admin SDK
       return [];
     } catch (e) {
-      print('Error getting unsynced users: $e');
+      debugPrint('Error getting unsynced users: $e');
       return [];
     }
   }
@@ -96,11 +97,11 @@ class FirebaseSyncService {
             'createdAt': FieldValue.serverTimestamp(),
             'syncedAt': FieldValue.serverTimestamp(),
           });
-          print('Synced auth user to Firestore: $uid');
+          debugPrint('Synced auth user to Firestore: $uid');
         }
       }
     } catch (e) {
-      print('Error syncing missing users: $e');
+      debugPrint('Error syncing missing users: $e');
       rethrow;
     }
   }
@@ -131,12 +132,12 @@ class FirebaseSyncService {
       // Delete the old document if UID was different
       if (firestoreUser.id != authUid) {
         await _firestore.collection('users').doc(firestoreUser.id).delete();
-        print('Removed old duplicate user document');
+        debugPrint('Removed old duplicate user document');
       }
 
-      print('Linked Firestore user to Auth: $authUid');
+      debugPrint('Linked Firestore user to Auth: $authUid');
     } catch (e) {
-      print('Error linking user: $e');
+      debugPrint('Error linking user: $e');
       rethrow;
     }
   }
@@ -150,7 +151,7 @@ class FirebaseSyncService {
       }
       return null;
     } catch (e) {
-      print('Error fetching Firestore user: $e');
+      debugPrint('Error fetching Firestore user: $e');
       return null;
     }
   }
@@ -181,7 +182,7 @@ class FirebaseSyncService {
         'isSynced': true, // Can't verify without Admin SDK
       };
     } catch (e) {
-      print('Error verifying sync: $e');
+      debugPrint('Error verifying sync: $e');
       return {'error': e.toString()};
     }
   }

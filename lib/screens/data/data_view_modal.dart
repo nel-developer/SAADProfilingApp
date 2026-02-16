@@ -6,7 +6,6 @@ import 'package:da_project_1/screens/data/data_edit_modal.dart';
 
 class DataViewModal extends StatefulWidget {
   final Map<String, dynamic> profileData;
-  final String userRole;
   final String dataStatus;
   final VoidCallback? onEdit;
   final VoidCallback? onSync;
@@ -19,7 +18,6 @@ class DataViewModal extends StatefulWidget {
   const DataViewModal({
     super.key,
     required this.profileData,
-    required this.userRole,
     required this.dataStatus,
     this.onEdit,
     this.onSync,
@@ -45,15 +43,42 @@ class _DataViewModalState extends State<DataViewModal> {
     }
   }
 
-  // Get last 3 years + current year (4 years total)
+  // Get the ProfilingData from the profileData map
+  dynamic _getProfileData() {
+    if (widget.profileData['data'] != null) {
+      return widget.profileData['data'];
+    }
+    return null;
+  }
+
+  // Get the year from profiling data (yearCovered field)
   List<int> _getRelevantYears() {
-    final currentYear = DateTime.now().year;
-    return [
-      currentYear - 3,
-      currentYear - 2,
-      currentYear - 1,
-      currentYear,
-    ];
+    final profileData = _getProfileData();
+    if (profileData == null) return [];
+    
+    // Get the year from yearCovered field
+    final yearCovered = profileData.yearCovered;
+    if (yearCovered == null) {
+      // Fallback to current year if not set
+      return [DateTime.now().year];
+    }
+    
+    try {
+      // Handle both string and int types
+      if (yearCovered is int) {
+        return [yearCovered];
+      } else if (yearCovered is String) {
+        if (yearCovered.isEmpty) {
+          return [DateTime.now().year];
+        }
+        final year = int.parse(yearCovered);
+        return [year];
+      }
+      return [DateTime.now().year];
+    } catch (e) {
+      debugPrint('⚠️ Error parsing year: $e');
+      return [DateTime.now().year];
+    }
   }
 
   void _toggleYear(int year) {
@@ -194,58 +219,69 @@ class _DataViewModalState extends State<DataViewModal> {
                       color: Colors.grey.shade300,
                     ),
                     SizedBox(height: 20 * scale),
-
                     _buildInfoRow(
                       'Surname:',
-                      'Dela Cruz',
+                      _getProfileData()?.surname ?? 'N/A',
                       'First Name:',
-                      'Juan',
+                      _getProfileData()?.firstName ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
                     _buildInfoRow(
                       'Middle Name:',
-                      'Santos',
+                      _getProfileData()?.middleName ?? 'N/A',
                       'Extension Name:',
-                      'JR',
+                      _getProfileData()?.extensionName ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
                     _buildInfoRow(
                       'Sex:',
-                      'Male',
+                      _getProfileData()?.sex ?? 'N/A',
                       'Date of Birth:',
-                      '11/01/1999',
+                      _getProfileData()?.dateOfBirth ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
 
                     SizedBox(height: 16 * scale),
+                    SizedBox(height: 12 * scale),
+                    if ((_getProfileData()?.approverEmail ?? '').toString().isNotEmpty)
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 4 * scale),
+                          child: Text(
+                            'Approved by: ${_getProfileData()?.approverEmail}${_getProfileData()?.approvedAt != null ? ' on ${_getProfileData()!.approvedAt!.toString().split(' ')[0]}' : ''}',
+                            style: GoogleFonts.poppins(fontSize: 11 * scale, color: Colors.grey.shade600),
+                          ),
+                        ),
+                      ),
                     _buildSectionTitle('Address', sectionTitleFontSize, scale),
                     _buildInfoRow(
                       'Region:',
-                      'IV-A',
+                      _getProfileData()?.region ?? 'N/A',
                       'Province:',
-                      'Batangas',
+                      _getProfileData()?.province ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
                     _buildInfoRow(
                       'Municipality:',
-                      'Lipa City',
+                      _getProfileData()?.municipality ?? 'N/A',
                       'Barangay:',
-                      'Sabang',
+                      _getProfileData()?.barangay ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
                     _buildSingleRow(
                       'Sitio/Purok:',
-                      'Purok 1',
+                      _getProfileData()?.sitioPurok ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
@@ -259,18 +295,27 @@ class _DataViewModalState extends State<DataViewModal> {
                     ),
                     _buildInfoRow(
                       'Member of an Indigenous Group:',
-                      'Yes',
+                      _getProfileData()?.isIndigenous == true ? 'Yes' : 'No',
                       'Person with Disability(PWD):',
-                      'Yes',
+                      _getProfileData()?.isPWD == true ? 'Yes' : 'No',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
+                    // Show indigenous group specification only if indigenous is true
+                    if (_getProfileData()?.isIndigenous == true)
+                      _buildSingleRow(
+                        'If yes, please specify (Indigenous Group):',
+                        _getProfileData()?.indigenousGroup ?? '___________',
+                        labelFontSize,
+                        valueFontSize,
+                        scale,
+                      ),
                     _buildInfoRow(
-                      'If yes, please specify:',
-                      '___________',
+                      'Tribe/Ethnicity:',
+                      _getProfileData()?.tribeEthnicity ?? 'N/A',
                       'Spouse Name:',
-                      '___________',
+                      _getProfileData()?.spouseName ?? '___________',
                       labelFontSize,
                       valueFontSize,
                       scale,
@@ -280,22 +325,30 @@ class _DataViewModalState extends State<DataViewModal> {
                     _buildSectionTitle('Main Commodity', sectionTitleFontSize, scale),
                     _buildInfoRow(
                       'Primary Commodity:',
-                      'Others',
+                      _getProfileData()?.primaryCommodity ?? 'N/A',
                       'Secondary Commodity:',
-                      'Others',
+                      _getProfileData()?.secondaryCommodity ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
-                    _buildInfoRow(
-                      'If yes, please specify:',
-                      '___________',
-                      'If yes, please specify:',
-                      '___________',
-                      labelFontSize,
-                      valueFontSize,
-                      scale,
-                    ),
+                    // Show "If Other, please specify" only when an "others" value exists
+                    if ((_getProfileData()?.primaryCommodityOthers ?? '').toString().isNotEmpty)
+                      _buildSingleRow(
+                        'If Primary is Other, specify:',
+                        _getProfileData()?.primaryCommodityOthers ?? '___________',
+                        labelFontSize,
+                        valueFontSize,
+                        scale,
+                      ),
+                    if ((_getProfileData()?.secondaryCommodityOthers ?? '').toString().isNotEmpty)
+                      _buildSingleRow(
+                        'If Secondary is Other, specify:',
+                        _getProfileData()?.secondaryCommodityOthers ?? '___________',
+                        labelFontSize,
+                        valueFontSize,
+                        scale,
+                      ),
 
                     SizedBox(height: 16 * scale),
                     _buildSectionTitle(
@@ -305,18 +358,18 @@ class _DataViewModalState extends State<DataViewModal> {
                     ),
                     _buildInfoRow(
                       'Organization Name:',
-                      'Mahika',
+                      _getProfileData()?.cooperativeName ?? 'N/A',
                       'Position:',
-                      'Others',
+                      _getProfileData()?.cooperativePosition ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
                     ),
                     _buildInfoRow(
                       'Date of Membership:',
-                      '11/12/25',
-                      'If yes, please specify:',
-                      '___________',
+                      _getProfileData()?.dateOfMembership ?? 'N/A',
+                      'If Other Position, specify:',
+                      _getProfileData()?.cooperativePositionOthers ?? '___________',
                       labelFontSize,
                       valueFontSize,
                       scale,
@@ -502,6 +555,8 @@ class _DataViewModalState extends State<DataViewModal> {
   }
 
   Widget _buildRecurrenceYear(String year, double labelSize, double valueSize, double scale, {bool isExpanded = false}) {
+    final profileData = _getProfileData();
+    
     return Container(
       margin: EdgeInsets.only(bottom: 12 * scale),
       decoration: BoxDecoration(
@@ -539,7 +594,7 @@ class _DataViewModalState extends State<DataViewModal> {
               ],
             ),
           ),
-          if (isExpanded)
+          if (isExpanded && profileData != null)
             Padding(
               padding: EdgeInsets.all(12 * scale),
               child: Column(
@@ -549,24 +604,32 @@ class _DataViewModalState extends State<DataViewModal> {
                   SizedBox(height: 8 * scale),
                   _buildInfoRow(
                     'Received Primary Commodity:',
-                    'Others',
+                    profileData.primaryCommodityRecurrence == true ? 'Yes' : 'No',
                     'Received Secondary Commodity:',
-                    'Others',
+                    profileData.secondaryCommodityRecurrence == true ? 'Yes' : 'No',
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
                   ),
-                  _buildInfoRow(
-                    'If yes, please specify:',
-                    '___________',
-                    'If yes, please specify:',
-                    '___________',
-                    labelSize - 1 * scale,
-                    valueSize - 1 * scale,
-                    scale,
-                  ),
+                  // No remarks are shown for recurrence (no fields exist); if a recurrence-specify field exists
+                  if ((profileData.primaryCommodityRecurrenceOthers ?? '').toString().isNotEmpty)
+                    _buildSingleRow(
+                      'If Primary Received Other, specify:',
+                      profileData.primaryCommodityRecurrenceOthers ?? '___________',
+                      labelSize - 1 * scale,
+                      valueSize - 1 * scale,
+                      scale,
+                    ),
+                  if ((profileData.secondaryCommodityRecurrenceOthers ?? '').toString().isNotEmpty)
+                    _buildSingleRow(
+                      'If Secondary Received Other, specify:',
+                      profileData.secondaryCommodityRecurrenceOthers ?? '___________',
+                      labelSize - 1 * scale,
+                      valueSize - 1 * scale,
+                      scale,
+                    ),
                   _buildSingleRow(
-                    'No. of Family Members:\nMale : 2     Female : 2',
+                    'No. of Family Members:\nMale: ${profileData.numberOfMalesInFamily ?? 0}     Female: ${profileData.numberOfFemalesInFamily ?? 0}',
                     '',
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
@@ -574,21 +637,21 @@ class _DataViewModalState extends State<DataViewModal> {
                   ),
                   _buildInfoRow(
                     'Land Tenureship:',
-                    'Others',
-                    'If yes, please specify:',
-                    '___________',
+                    profileData.landTenureship ?? 'N/A',
+                    'If Other, specify:',
+                    profileData.landTenureshipOthers ?? '___________',
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
                   ),
                   Text(
-                    'No of Years Fishing/Farming: 5',
+                    'No of Years Farming/Fishing: ${profileData.yearsInFarming ?? 0}',
                     style: GoogleFonts.poppins(fontSize: labelSize),
                   ),
                   
                   SizedBox(height: 12 * scale),
                   
-                  // ═══ MONTHLY FAMILY INCOME (NOW INSIDE RECURRENCE) ═══
+                  // MONTHLY FAMILY INCOME
                   Container(
                     width: double.infinity,
                     padding: EdgeInsets.symmetric(vertical: 6 * scale),
@@ -609,19 +672,19 @@ class _DataViewModalState extends State<DataViewModal> {
                   ),
                   SizedBox(height: 8 * scale),
                   _buildInfoRow(
-                    'Derived from Agri-Related Activities(Gross)',
-                    '₱25,000',
-                    'SAAD Net Income',
-                    '₱25,000',
+                    'From Agri-Related (Gross):',
+                    '₱${profileData.agriRelatedIncome ?? 0}',
+                    'SAAD Net Income:',
+                    '₱${profileData.saadNetIncome ?? 0}',
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
                   ),
                   _buildInfoRow(
-                    'Derived from Non Agri-Related Activities(Gross)',
-                    '₱25,000',
-                    'Main Sources of Income',
-                    '₱25,000',
+                    'From Non-Agri (Gross):',
+                    '₱${profileData.nonAgriRelatedIncome ?? 0}',
+                    'Main Sources:',
+                    profileData.mainSourcesOfIncome ?? 'N/A',
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
@@ -636,12 +699,30 @@ class _DataViewModalState extends State<DataViewModal> {
 
   /// MULTILINE FARM INCOME DISPLAY - 1 FIELD FOR AMOUNTS, 1 FOR REMARKS
   Widget _buildFarmIncomeMultiline(double labelSize, double valueSize, double scale) {
+    final profileData = _getProfileData();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// PRIMARY COMMODITY
+        _buildCommodityDisplay('Rice / Corn', profileData?.riceIncomeField, profileData?.riceRemarks, labelSize, valueSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityDisplay('HVC', profileData?.hvcIncomeField, profileData?.hvcRemarks, labelSize, valueSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityDisplay('Livestock', profileData?.livestockIncomeField, profileData?.livestockRemarks, labelSize, valueSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityDisplay('Fishing', profileData?.fishingIncomeField, profileData?.fishingRemarks, labelSize, valueSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityDisplay('Non-Farm Fisheries', profileData?.nonFarmFisheriesIncomeField, profileData?.nonFarmFisheriesRemarks, labelSize, valueSize, scale),
+      ],
+    );
+  }
+
+  Widget _buildCommodityDisplay(String title, String? amount, String? remarks, double labelSize, double valueSize, double scale) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
-          'Primary Commodity',
+          title,
           style: GoogleFonts.poppins(
             fontSize: labelSize + 2 * scale,
             fontWeight: FontWeight.w700,
@@ -649,53 +730,9 @@ class _DataViewModalState extends State<DataViewModal> {
           ),
         ),
         SizedBox(height: 8 * scale),
-
-        _buildMultilineField(
-          'Amount:',
-          '₱25,000\n+₱25,000\n₱25,000',
-          labelSize,
-          valueSize,
-          scale,
-        ),
+        _buildMultilineField('Amount:', amount ?? '___________', labelSize, valueSize, scale),
         SizedBox(height: 8 * scale),
-
-        _buildMultilineField(
-          'Remarks:',
-          '',
-          labelSize,
-          valueSize,
-          scale,
-        ),
-
-        SizedBox(height: 20 * scale),
-
-        /// SECONDARY COMMODITY
-        Text(
-          'Secondary Commodity',
-          style: GoogleFonts.poppins(
-            fontSize: labelSize + 2 * scale,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 8 * scale),
-
-        _buildMultilineField(
-          'Amount:',
-          '₱25,000\n+₱25,000\n₱25,000',
-          labelSize,
-          valueSize,
-          scale,
-        ),
-        SizedBox(height: 8 * scale),
-
-        _buildMultilineField(
-          'Remarks:',
-          '',
-          labelSize,
-          valueSize,
-          scale,
-        ),
+        _buildMultilineField('Remarks:', remarks ?? '___________', labelSize, valueSize, scale),
       ],
     );
   }

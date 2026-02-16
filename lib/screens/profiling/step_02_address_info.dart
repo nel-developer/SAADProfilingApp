@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
+import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/location_service.dart';
 
 /// Step 2 of 8 — Address Information
 /// Fields: Region, Province, Municipality/City, Barangay, Sitio/Purok, Date of Birth, Sex
@@ -10,12 +12,14 @@ class Step02AddressInfo extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step02AddressInfo({
     super.key,
     required this.onNext,
     required this.onBack,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -29,9 +33,151 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
   final TextEditingController _barangayCtrl = TextEditingController();
   final TextEditingController _sitioPurokCtrl = TextEditingController();
   final TextEditingController _dateOfBirthCtrl = TextEditingController();
-  
+
   String? _selectedSex;
   final List<String> _sexOptions = ['Male', 'Female'];
+
+  // Location data structures
+  final LocationService _locationService = LocationService();
+  List<String> _regions = [];
+  List<String> _provinces = [];
+  List<String> _municipalities = [];
+  List<String> _barangays = [];
+  
+  bool _locationsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners only once in initState to prevent duplicates
+    _regionCtrl.addListener(_autoSaveToCurrentData);
+    _provinceCtrl.addListener(_autoSaveToCurrentData);
+    _municipalityCtrl.addListener(_autoSaveToCurrentData);
+    _barangayCtrl.addListener(_autoSaveToCurrentData);
+    _sitioPurokCtrl.addListener(_autoSaveToCurrentData);
+    _dateOfBirthCtrl.addListener(_autoSaveToCurrentData);
+    _loadDataAndPopulateDropdowns();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Populate dependent dropdowns if region was already selected
+    // (happens after initState or when returning to this step)
+    if (_regionCtrl.text.isNotEmpty && _regions.isNotEmpty && _provinces.isEmpty) {
+      _populateDropdownsForCurrentData();
+    }
+  }
+
+  @override
+  void didUpdateWidget(Step02AddressInfo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step via back button
+    _loadDataAndPopulateDropdowns();
+  }
+
+  void _loadDataAndPopulateDropdowns() {
+    // Prefill from shared currentData if available
+    if (widget.currentData != null) {
+      _regionCtrl.text = widget.currentData!.region ?? '';
+      _provinceCtrl.text = widget.currentData!.province ?? '';
+      _municipalityCtrl.text = widget.currentData!.municipality ?? '';
+      _barangayCtrl.text = widget.currentData!.barangay ?? '';
+      _sitioPurokCtrl.text = widget.currentData!.sitioPurok ?? '';
+      _dateOfBirthCtrl.text = widget.currentData!.dateOfBirth ?? '';
+      _selectedSex = widget.currentData!.sex;
+    }
+    
+    // If regions are loaded, populate the dropdowns
+    if (_regions.isNotEmpty) {
+      _populateDropdownsForCurrentData();
+    }
+  }
+
+  void _autoSaveToCurrentData() {
+    if (widget.currentData != null) {
+      widget.currentData!.region = _regionCtrl.text.trim();
+      widget.currentData!.province = _provinceCtrl.text.trim();
+      widget.currentData!.municipality = _municipalityCtrl.text.trim();
+      widget.currentData!.barangay = _barangayCtrl.text.trim();
+      widget.currentData!.sitioPurok = _sitioPurokCtrl.text.trim();
+      widget.currentData!.dateOfBirth = _dateOfBirthCtrl.text.trim();
+      widget.currentData!.sex = _selectedSex;
+    }
+  }
+
+  void _populateDropdownsForCurrentData() {
+    if (_regionCtrl.text.isEmpty) return;
+    
+    // Get provinces for the selected region
+    _provinces = _locationService.getProvinces(_regionCtrl.text);
+
+    if (_provinceCtrl.text.isNotEmpty && _provinces.contains(_provinceCtrl.text)) {
+      // Get municipalities for the selected province
+      _municipalities = _locationService.getMunicipalities(_regionCtrl.text, _provinceCtrl.text);
+
+      if (_municipalityCtrl.text.isNotEmpty && _municipalities.contains(_municipalityCtrl.text)) {
+        // Get barangays for the selected municipality
+        _barangays = _locationService.getBarangays(_regionCtrl.text, _provinceCtrl.text, _municipalityCtrl.text);
+      }
+    }
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      await _locationService.loadLocations();
+      setState(() {
+        _regions = _locationService.getRegions();
+        // After loading locations, populate dropdowns if we have currentData
+        _loadDataAndPopulateDropdowns();
+      });
+    } catch (e) {
+      debugPrint('❌ Error loading locations: $e');
+    }
+  }
+
+  void _onRegionChanged(String? regionName) {
+    if (regionName == null) return;
+
+    setState(() {
+      _regionCtrl.text = regionName;
+      _provinceCtrl.clear();
+      _municipalityCtrl.clear();
+      _barangayCtrl.clear();
+      _provinces = _locationService.getProvinces(regionName);
+      _municipalities = [];
+      _barangays = [];
+    });
+  }
+
+  void _onProvinceChanged(String? provinceName) {
+    if (provinceName == null || _regionCtrl.text.isEmpty) return;
+
+    setState(() {
+      _provinceCtrl.text = provinceName;
+      _municipalityCtrl.clear();
+      _barangayCtrl.clear();
+      _municipalities = _locationService.getMunicipalities(_regionCtrl.text, provinceName);
+      _barangays = [];
+    });
+  }
+
+  void _onMunicipalityChanged(String? municipalityName) {
+    if (municipalityName == null || _regionCtrl.text.isEmpty || _provinceCtrl.text.isEmpty) return;
+
+    setState(() {
+      _municipalityCtrl.text = municipalityName;
+      _barangayCtrl.clear();
+      _barangays = _locationService.getBarangays(_regionCtrl.text, _provinceCtrl.text, municipalityName);
+    });
+  }
+
+  void _onBarangayChanged(String? barangayName) {
+    if (barangayName == null) return;
+    setState(() {
+      _barangayCtrl.text = barangayName;
+    });
+  }
 
   @override
   void dispose() {
@@ -88,78 +234,80 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     final double labelFieldGap = isLargeTablet ? 8.0 : 6.0;
     final double fieldHeight = isLargeTablet ? 54.0 : isTablet ? 50.0 : 44.0;
 
+    // Lazy-load locations on first build (not in initState to avoid blocking UI)
+    if (!_locationsLoaded && mounted) {
+      _locationsLoaded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadLocations();
+      });
+    }
+
     return ProfilingStepWrapper(
       currentStep: 2,
       sectionTitle: 'Address',
-      onNext: widget.onNext,
+      onNext: _handleNext,
       onBack: widget.onBack,
       onHeaderBack: widget.onHeaderBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ─────────────────────────────────────────────────────────
-          // REGION
-          // ─────────────────────────────────────────────────────────
+          // Region dropdown
           _label('Region', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
             height: fieldHeight,
-            child: _shadowedField(
-              controller: _regionCtrl,
-              hint: 'Enter Region',
+            child: _shadowedDropdown(
+              value: _regionCtrl.text.isEmpty ? null : _regionCtrl.text,
+              hint: 'Select Region',
+              items: _regions,
+              onChanged: _onRegionChanged,
             ),
           ),
-
           SizedBox(height: fieldGap),
 
-          // ─────────────────────────────────────────────────────────
-          // PROVINCE
-          // ─────────────────────────────────────────────────────────
+          // Province dropdown
           _label('Province', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
             height: fieldHeight,
-            child: _shadowedField(
-              controller: _provinceCtrl,
-              hint: 'Enter Province',
+            child: _shadowedDropdown(
+              value: _provinceCtrl.text.isEmpty ? null : _provinceCtrl.text,
+              hint: 'Select Province',
+              items: _provinces,
+              onChanged: _onProvinceChanged,
             ),
           ),
-
           SizedBox(height: fieldGap),
 
-          // ─────────────────────────────────────────────────────────
-          // MUNICIPALITY/CITY
-          // ─────────────────────────────────────────────────────────
+          // Municipality/City dropdown
           _label('Municipality/City', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
             height: fieldHeight,
-            child: _shadowedField(
-              controller: _municipalityCtrl,
-              hint: 'Enter Municipality/City',
+            child: _shadowedDropdown(
+              value: _municipalityCtrl.text.isEmpty ? null : _municipalityCtrl.text,
+              hint: 'Select Municipality/City',
+              items: _municipalities,
+              onChanged: _onMunicipalityChanged,
             ),
           ),
-
           SizedBox(height: fieldGap),
 
-          // ─────────────────────────────────────────────────────────
-          // BARANGAY
-          // ─────────────────────────────────────────────────────────
+          // Barangay dropdown
           _label('Barangay', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
             height: fieldHeight,
-            child: _shadowedField(
-              controller: _barangayCtrl,
-              hint: 'Enter Barangay',
+            child: _shadowedDropdown(
+              value: _barangayCtrl.text.isEmpty ? null : _barangayCtrl.text,
+              hint: 'Select Barangay',
+              items: _barangays,
+              onChanged: _onBarangayChanged,
             ),
           ),
-
           SizedBox(height: fieldGap),
 
-          // ─────────────────────────────────────────────────────────
-          // SITIO/PUROK
-          // ─────────────────────────────────────────────────────────
+          // Sitio/Purok text field
           _label('Sitio/Purok', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
@@ -169,35 +317,29 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
               hint: 'Enter Sitio/Purok',
             ),
           ),
-
           SizedBox(height: fieldGap),
 
-          // ─────────────────────────────────────────────────────────
-          // DATE OF BIRTH (with calendar icon)
-          // ─────────────────────────────────────────────────────────
+          // Date of Birth
           _label('Date of Birth', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
             height: fieldHeight,
             child: _shadowedDateField(
               controller: _dateOfBirthCtrl,
-              hint: 'Enter Date of Birth',
+              hint: 'Select Date of Birth',
               onTap: () => _selectDate(context),
             ),
           ),
-
           SizedBox(height: fieldGap),
 
-          // ─────────────────────────────────────────────────────────
-          // SEX (dropdown)
-          // ─────────────────────────────────────────────────────────
+          // Sex dropdown
           _label('Sex', labelSize),
           SizedBox(height: labelFieldGap),
           SizedBox(
             height: fieldHeight,
             child: _shadowedDropdown(
               value: _selectedSex,
-              hint: 'Enter Sex',
+              hint: 'Select Sex',
               items: _sexOptions,
               onChanged: (value) {
                 setState(() {
@@ -209,6 +351,23 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
         ],
       ),
     );
+  }
+
+  void _handleNext() {
+    // All fields on this step are optional; validation happens at final submit only
+
+    // Write back to currentData
+    if (widget.currentData != null) {
+      widget.currentData!.region = _regionCtrl.text.trim();
+      widget.currentData!.province = _provinceCtrl.text.trim();
+      widget.currentData!.municipality = _municipalityCtrl.text.trim();
+      widget.currentData!.barangay = _barangayCtrl.text.trim();
+      widget.currentData!.sitioPurok = _sitioPurokCtrl.text.trim();
+      widget.currentData!.dateOfBirth = _dateOfBirthCtrl.text.trim();
+      widget.currentData!.sex = _selectedSex;
+    }
+
+    widget.onNext();
   }
 
   // ---------------------------------------------------------------------------

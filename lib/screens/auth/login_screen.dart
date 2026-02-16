@@ -132,10 +132,12 @@ class _LoginScreenState extends State<LoginScreen>
         password: password,
       );
 
-      if (userCredential?.user != null && mounted) {
+      if (userCredential?.user != null) {
         // Fast path: try cached minimal user data first to avoid blocking login
         final uid = userCredential!.user!.uid;
         final cached = await _authService.getCachedUserData(uid);
+
+        if (!mounted) return;
 
         String? accountStatus = cached?['accountStatus'] as String?;
 
@@ -145,7 +147,8 @@ class _LoginScreenState extends State<LoginScreen>
             Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
           } else if (accountStatus == 'rejected') {
             await _authService.signOut();
-            if (mounted) _showErrorDialog('Your account has been rejected. Please contact support.');
+            if (!mounted) return;
+            _showErrorDialog('Your account has been rejected. Please contact support.');
           } else {
             Navigator.pushReplacementNamed(context, AppRoutes.home);
           }
@@ -159,13 +162,15 @@ class _LoginScreenState extends State<LoginScreen>
           final userData = await _authService
               .getUserData(uid)
               .timeout(const Duration(milliseconds: 800), onTimeout: () => null);
+          if (!mounted) return;
           accountStatus = userData?['accountStatus'];
 
           if (accountStatus == 'pending_review') {
             Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
           } else if (accountStatus == 'rejected') {
             await _authService.signOut();
-            if (mounted) _showErrorDialog('Your account has been rejected. Please contact support.');
+            if (!mounted) return;
+            _showErrorDialog('Your account has been rejected. Please contact support.');
           } else {
             Navigator.pushReplacementNamed(context, AppRoutes.home);
           }
@@ -463,9 +468,9 @@ class _LoginScreenState extends State<LoginScreen>
                               CupertinoButton(
                                 padding: EdgeInsets.zero,
                                 onPressed: () {
-                                  Navigator.pushReplacementNamed(
+                                  Navigator.pushNamed(
                                     context,
-                                    AppRoutes.accountUnderReview,
+                                    AppRoutes.forgotPassword,
                                   );
                                 }, minimumSize: Size(0, 0),
                                 child: Text(

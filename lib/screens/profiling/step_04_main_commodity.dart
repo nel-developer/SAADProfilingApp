@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
+import 'package:da_project_1/models/profiling_data.dart';
 
 /// Step 4 of 8 — Main Commodity
 /// Fields: Primary Commodity (dropdown), Secondary Commodity (dropdown)
@@ -11,12 +12,14 @@ class Step04MainCommodity extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step04MainCommodity({
     super.key,
     required this.onNext,
     required this.onBack,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -25,7 +28,7 @@ class Step04MainCommodity extends StatefulWidget {
 
 class _Step04MainCommodityState extends State<Step04MainCommodity> {
   String? _primaryCommodity;
-  String? _secondaryCommodity;
+  List<String> _secondaryCommodities = []; // Multi-select for secondary
   final TextEditingController _primaryOthersCtrl = TextEditingController();
   final TextEditingController _secondaryOthersCtrl = TextEditingController();
 
@@ -40,10 +43,59 @@ class _Step04MainCommodityState extends State<Step04MainCommodity> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Add listeners only once in initState to prevent duplicates
+    _primaryOthersCtrl.addListener(_autoSaveToCurrentData);
+    _secondaryOthersCtrl.addListener(_autoSaveToCurrentData);
+    _loadData();
+  }
+
+  void _loadData() {
+    if (widget.currentData != null) {
+      _primaryCommodity = widget.currentData!.primaryCommodity;
+      // Parse comma-separated secondary commodities
+      final secondary = widget.currentData!.secondaryCommodity ?? '';
+      _secondaryCommodities = secondary.isEmpty ? [] : secondary.split(',').map((s) => s.trim()).toList();
+      _primaryOthersCtrl.text = widget.currentData!.primaryCommodityOthers ?? '';
+      _secondaryOthersCtrl.text = widget.currentData!.secondaryCommodityOthers ?? '';
+    }
+  }
+
+  void _autoSaveToCurrentData() {
+    if (widget.currentData != null) {
+      widget.currentData!.primaryCommodity = _primaryCommodity;
+      widget.currentData!.secondaryCommodity = _secondaryCommodities.join(', ');
+      widget.currentData!.primaryCommodityOthers = _primaryOthersCtrl.text.trim();
+      widget.currentData!.secondaryCommodityOthers = _secondaryOthersCtrl.text.trim();
+    }
+  }
+
+  @override
   void dispose() {
     _primaryOthersCtrl.dispose();
     _secondaryOthersCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(Step04MainCommodity oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step via back button
+    _loadData();
+  }
+
+  void _handleNext() {
+    // No step-level validation; all validation happens at final submit
+    // Save data to shared currentData before proceeding
+    if (widget.currentData != null) {
+      widget.currentData!.primaryCommodity = _primaryCommodity;
+      // Store as comma-separated string
+      widget.currentData!.secondaryCommodity = _secondaryCommodities.join(', ');
+      widget.currentData!.primaryCommodityOthers = _primaryOthersCtrl.text.trim();
+      widget.currentData!.secondaryCommodityOthers = _secondaryOthersCtrl.text.trim();
+    }
+    widget.onNext();
   }
 
   @override
@@ -60,7 +112,7 @@ class _Step04MainCommodityState extends State<Step04MainCommodity> {
     return ProfilingStepWrapper(
       currentStep: 4,
       sectionTitle: 'Main Commodity',
-      onNext: widget.onNext,
+      onNext: _handleNext,
       onBack: widget.onBack,
       onHeaderBack: widget.onHeaderBack,
       child: Column(
@@ -83,6 +135,7 @@ class _Step04MainCommodityState extends State<Step04MainCommodity> {
                   if (value != 'Others') {
                     _primaryOthersCtrl.clear();
                   }
+                  _autoSaveToCurrentData();
                 });
               },
             ),
@@ -113,29 +166,14 @@ class _Step04MainCommodityState extends State<Step04MainCommodity> {
           SizedBox(height: fieldGap),
 
           // ─────────────────────────────────────────────────────────
-          // SECONDARY COMMODITY
+          // SECONDARY COMMODITY (MULTI-SELECT)
           // ─────────────────────────────────────────────────────────
-          _label('Secondary Commodity', labelSize),
+          _label('Secondary Commodity (select one or more)', labelSize),
           SizedBox(height: labelFieldGap),
-          SizedBox(
-            height: fieldHeight,
-            child: _shadowedDropdown(
-              value: _secondaryCommodity,
-              hint: 'Enter Secondary Commodity',
-              items: _commodityOptions,
-              onChanged: (value) {
-                setState(() {
-                  _secondaryCommodity = value;
-                  if (value != 'Others') {
-                    _secondaryOthersCtrl.clear();
-                  }
-                });
-              },
-            ),
-          ),
+          _buildSecondaryMultiSelect(labelSize),
 
           // Conditional "Others" text field for Secondary
-          if (_secondaryCommodity == 'Others') ...[
+          if (_secondaryCommodities.contains('Others')) ...[
             SizedBox(height: labelFieldGap + 4),
             Text(
               'if others, please specify:',
@@ -274,6 +312,97 @@ class _Step04MainCommodityState extends State<Step04MainCommodity> {
           );
         }).toList(),
         onChanged: onChanged,
+      ),
+    );
+  }
+
+  // Get secondary commodity options (exclude primary commodity)
+  List<String> _getSecondaryOptions() {
+    if (_primaryCommodity == null || _primaryCommodity!.isEmpty) {
+      return _commodityOptions;
+    }
+    return _commodityOptions.where((item) => item != _primaryCommodity).toList();
+  }
+
+  // Multi-select widget for secondary commodities
+  Widget _buildSecondaryMultiSelect(double labelSize) {
+    final secondaryOptions = _getSecondaryOptions();
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 12,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: secondaryOptions.map((item) {
+            final isSelected = _secondaryCommodities.contains(item);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _secondaryCommodities.remove(item);
+                  } else {
+                    _secondaryCommodities.add(item);
+                  }
+                  // Clear "Others" field if "Others" is deselected
+                  if (item == 'Others' && !_secondaryCommodities.contains('Others')) {
+                    _secondaryOthersCtrl.clear();
+                  }
+                  _autoSaveToCurrentData();
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (_) {
+                        setState(() {
+                          if (isSelected) {
+                            _secondaryCommodities.remove(item);
+                          } else {
+                            _secondaryCommodities.add(item);
+                          }
+                          if (item == 'Others' && !_secondaryCommodities.contains('Others')) {
+                            _secondaryOthersCtrl.clear();
+                          }
+                          _autoSaveToCurrentData();
+                        });
+                      },
+                      activeColor: DAColors.primaryGreen,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      item,
+                      style: GoogleFonts.poppins(
+                        fontSize: labelSize - 2,
+                        fontWeight: FontWeight.w400,
+                        color: DAColors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

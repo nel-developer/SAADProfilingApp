@@ -30,7 +30,7 @@ Check if online?
 Complete data model holding all 8 profiling steps' fields:
 - **Step 1**: firstName, middleName, surname, extension
 - **Step 2**: region, province, municipality, barangay, sitio, dateOfBirth, sex
-- **Step 3**: indigenousStatus, pwdStatus, maritalStatus, spouseName
+- **Step 3**: indigenousStatus, pwdStatus, spouseName
 - **Step 4**: primaryCommodities, secondaryCommodities, othersText
 - **Step 5**: familyCount, yearsInFarming, tenureship, comoditiesGrown, yearCovered
 - **Step 6**: incomeSources (4 fields)

@@ -88,7 +88,7 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
           }
         }
       } catch (e) {
-        print('Error checking approval status: $e');
+        debugPrint('Error checking approval status: $e');
       }
     });
   }

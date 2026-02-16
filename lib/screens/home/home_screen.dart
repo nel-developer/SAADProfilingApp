@@ -26,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   final FirebaseAuthService _authService = FirebaseAuthService();
   String? _userRole;
+  String? _firstName;
 
   @override
   void initState() {
@@ -103,8 +104,11 @@ class _HomeScreenState extends State<HomeScreen>
       // before querying Firestore. This is faster and avoids fetching full
       // user documents just to read the role.
       final role = await _authService.getUserRole(user.uid);
+      final userData = await _authService.getUserData(user.uid);
+      final fetchedFirst = userData?['firstName'] as String?;
       setState(() {
         _userRole = role;
+        _firstName = (fetchedFirst != null && fetchedFirst.isNotEmpty) ? fetchedFirst : null;
       });
     }
   }
@@ -201,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen>
                                           ),
                                         ),
                                         TextSpan(
-                                          text: 'Juan!',
+                                          text: '${_firstName ?? 'User'}!',
                                           style: GoogleFonts.poppins(
                                             fontSize: welcomeFont,
                                             fontWeight: FontWeight.w700,
@@ -268,11 +272,9 @@ class _HomeScreenState extends State<HomeScreen>
                           child: HomeTile(
                             label: 'Profiling',
                             icon: Icons.person_outline,
-                              route: AppRoutes.profiling,
-                              animation: _tile2Anim,
-                              isEnabled: _userRole != null &&
-                                ['admin', 'profiler']
-                                  .contains(_userRole!.toLowerCase()),
+                            route: AppRoutes.profiling,
+                            animation: _tile2Anim,
+                            isEnabled: true, // Everyone can profile
                               onDisabledTap: _showLockedAlert,
                           ),
                         ),
@@ -292,7 +294,9 @@ class _HomeScreenState extends State<HomeScreen>
                             icon: Icons.people_outline,
                             route: AppRoutes.accounts,
                             animation: _tile3Anim,
-                            isEnabled: _userRole?.toLowerCase() == 'admin',
+                            isEnabled: _userRole != null &&
+                                ['admin', 'moderator']
+                                  .contains(_userRole!.toLowerCase()),
                             onDisabledTap: _showLockedAlert,
                           ),
                         ),

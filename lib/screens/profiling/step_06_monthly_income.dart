@@ -3,8 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
+import 'package:da_project_1/models/profiling_data.dart';
 
-/// Step 6 of 8 — Monthly Family Income
+/// Step 7 of 8 — Monthly Family Income
 ///
 /// Fields:
 ///   • Derived from Agri-Related Activities Only (Gross)
@@ -15,12 +16,14 @@ class Step06MonthlyIncome extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback? onBack;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step06MonthlyIncome({
     super.key,
     required this.onNext,
     this.onBack,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -34,12 +37,59 @@ class _Step06MonthlyIncomeState extends State<Step06MonthlyIncome> {
   final TextEditingController _mainSourcesCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Add listeners only once in initState to prevent duplicates
+    _agriRelatedCtrl.addListener(_autoSaveToCurrentData);
+    _saadNetCtrl.addListener(_autoSaveToCurrentData);
+    _nonAgriRelatedCtrl.addListener(_autoSaveToCurrentData);
+    _mainSourcesCtrl.addListener(_autoSaveToCurrentData);
+    _loadData();
+  }
+
+  @override
+  void didUpdateWidget(Step06MonthlyIncome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step via back button
+    _loadData();
+  }
+
+  void _loadData() {
+    if (widget.currentData != null) {
+      _agriRelatedCtrl.text = widget.currentData!.agriRelatedIncome?.toString() ?? '';
+      _saadNetCtrl.text = widget.currentData!.saadNetIncome?.toString() ?? '';
+      _nonAgriRelatedCtrl.text = widget.currentData!.nonAgriRelatedIncome?.toString() ?? '';
+      _mainSourcesCtrl.text = widget.currentData!.mainSourcesOfIncome ?? '';
+    }
+  }
+
+  void _autoSaveToCurrentData() {
+    if (widget.currentData != null) {
+      widget.currentData!.agriRelatedIncome = double.tryParse(_agriRelatedCtrl.text);
+      widget.currentData!.saadNetIncome = double.tryParse(_saadNetCtrl.text);
+      widget.currentData!.nonAgriRelatedIncome = double.tryParse(_nonAgriRelatedCtrl.text);
+      widget.currentData!.mainSourcesOfIncome = _mainSourcesCtrl.text.trim();
+    }
+  }
+
+  @override
   void dispose() {
     _agriRelatedCtrl.dispose();
     _saadNetCtrl.dispose();
     _nonAgriRelatedCtrl.dispose();
     _mainSourcesCtrl.dispose();
     super.dispose();
+  }
+
+  void _handleNext() {
+    // Save without per-step validation (final validation happens on submit)
+    if (widget.currentData != null) {
+      widget.currentData!.agriRelatedIncome = double.tryParse(_agriRelatedCtrl.text);
+      widget.currentData!.saadNetIncome = double.tryParse(_saadNetCtrl.text);
+      widget.currentData!.nonAgriRelatedIncome = double.tryParse(_nonAgriRelatedCtrl.text);
+      widget.currentData!.mainSourcesOfIncome = _mainSourcesCtrl.text.trim();
+    }
+    widget.onNext();
   }
 
   @override
@@ -54,9 +104,9 @@ class _Step06MonthlyIncomeState extends State<Step06MonthlyIncome> {
     final double fieldHeight = isLargeTablet ? 54.0 : isTablet ? 50.0 : 44.0;
 
     return ProfilingStepWrapper(
-      currentStep: 6,
+      currentStep: 7,
       sectionTitle: 'Monthly Family Income',
-      onNext: widget.onNext,
+      onNext: _handleNext,
       onBack: widget.onBack,
       onHeaderBack: widget.onHeaderBack,
       child: Column(
@@ -119,8 +169,7 @@ class _Step06MonthlyIncomeState extends State<Step06MonthlyIncome> {
             height: fieldHeight,
             child: _shadowedField(
               controller: _mainSourcesCtrl,
-              hint: 'Enter Amount',
-              keyboardType: TextInputType.number,
+              hint: 'Enter Main Sources',
             ),
           ),
         ],

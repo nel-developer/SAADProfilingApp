@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/green_header_section.dart';
@@ -11,10 +11,12 @@ import 'package:da_project_1/screens/profiling/step_05_recurrence.dart';
 import 'package:da_project_1/screens/profiling/step_06_monthly_income.dart';
 import 'package:da_project_1/screens/profiling/step_07_farm_income.dart';
 import 'package:da_project_1/screens/profiling/step_08_signature.dart';
+import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
-// ════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PROFILING FLOW - Main Entry Point
-// ════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 /// ProfilingFlow - Parent widget that manages all 8 profiling steps
 class ProfilingFlow extends StatefulWidget {
@@ -26,6 +28,43 @@ class ProfilingFlow extends StatefulWidget {
 
 class _ProfilingFlowState extends State<ProfilingFlow> {
   int _currentStep = 1;
+  ProfilingData _currentData = ProfilingData();
+  final ProfilingStorageService _storage = ProfilingStorageService();
+  bool _formSubmittedSuccessfully = false; // Track if form was submitted
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDraftIfExists();
+    // Do NOT auto-generate temp ID on flow open — only when saving to Firestore
+  }
+
+  @override
+  void dispose() {
+    // NEVER auto-delete draft on dispose
+    // User data is precious - keep it even if they navigate away
+    // Only delete if user explicitly taps "Cancel" button
+    if (_formSubmittedSuccessfully) {
+      debugPrint('✅ Form submitted successfully - draft will be shown as local unsync');
+    }
+    super.dispose();
+  }
+
+  // Temp ID generation removed — only set when saving to Firestore pending collection
+
+  Future<void> _loadDraftIfExists() async {
+    try {
+      final draft = await _storage.loadDraftLocally();
+      if (!mounted) return;
+      if (draft != null) {
+        setState(() {
+          _currentData = draft;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading draft: $e');
+    }
+  }
 
   void _goToNextStep() {
     if (_currentStep < 8) {
@@ -46,109 +85,282 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
   }
 
   void _goToHome() {
-    Navigator.pop(context);
-  }
-
-  void _submitForm() {
-    // TODO: Handle form submission (Step 8)
+    // User clicked home button — ask if they want to keep or discard draft
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Success'),
-        content: const Text('Profiling form submitted!'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard Draft?'),
+        content: const Text('Your unsaved data will be deleted. Continue?'),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to previous screen
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Keep Draft'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await _storage.deleteDraftLocally();
+                debugPrint('✅ Draft deleted by user request');
+                if (!mounted) return;
+                Navigator.pop(context);
+              } catch (e) {
+                debugPrint('⚠️ Error deleting draft: $e');
+                if (!mounted) return;
+                Navigator.pop(context);
+              }
             },
-            child: const Text('OK'),
+            child: const Text('Discard', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _submitForm() async {
+    // Centralized final validation before saving
+    final missing = <int, List<String>>{};
+
+    void addMissing(int step, String label) {
+      missing.putIfAbsent(step, () => []).add(label);
+    }
+
+    // Step 1 - Personal Info
+    if (_currentData.firstName == null || _currentData.firstName!.trim().isEmpty) addMissing(1, 'First Name');
+    if (_currentData.middleName == null || _currentData.middleName!.trim().isEmpty) addMissing(1, 'Middle Name');
+    if (_currentData.surname == null || _currentData.surname!.trim().isEmpty) addMissing(1, 'Surname');
+    // extensionName is exempt
+    if (_currentData.dateOfBirth == null || _currentData.dateOfBirth!.trim().isEmpty) addMissing(1, 'Date of Birth');
+    if (_currentData.sex == null || _currentData.sex!.trim().isEmpty) addMissing(1, 'Sex');
+
+    // Step 2 - Address (optional)
+    // Address fields are intentionally optional; do not block submission if empty.
+
+    // Step 3 - Other Personal
+    if (_currentData.isIndigenous == null) addMissing(3, 'Is Indigenous');
+    if ((_currentData.isIndigenous ?? false) && (_currentData.indigenousGroup == null || _currentData.indigenousGroup!.trim().isEmpty)) addMissing(3, 'Indigenous Group');
+    if (_currentData.isPWD == null) addMissing(3, 'Is PWD');
+    // spouseName is exempt (not required)
+    if (_currentData.tribeEthnicity == null || _currentData.tribeEthnicity!.trim().isEmpty) addMissing(3, 'Tribe / Ethnicity');
+
+    // Step 4 - Main Commodity
+    if (_currentData.primaryCommodity == null || _currentData.primaryCommodity!.trim().isEmpty) addMissing(4, 'Primary Commodity');
+    if (_currentData.secondaryCommodity == null || _currentData.secondaryCommodity!.trim().isEmpty) addMissing(4, 'Secondary Commodity');
+
+    // Step 5 - Farm/Fisheries Income (no required breakdown fields; optional)
+
+    // Step 6 - Recurrence
+    if (_currentData.maleFamilyMembers == null) addMissing(6, 'No. of Male Family Members');
+    if (_currentData.femaleFamilyMembers == null) addMissing(6, 'No. of Female Family Members');
+    if (_currentData.yearsInFarming == null) addMissing(6, 'Years in Farming');
+    if (_currentData.landTenureship == null || _currentData.landTenureship!.trim().isEmpty) addMissing(6, 'Land Tenureship');
+    if (_currentData.landTenureship == 'Other' && (_currentData.landTenureshipOthers == null || _currentData.landTenureshipOthers!.trim().isEmpty)) addMissing(6, 'Land Tenureship (Other)');
+    if (_currentData.secondaryCommodityRecurrence == null || _currentData.secondaryCommodityRecurrence!.trim().isEmpty) addMissing(6, 'Secondary Commodity (Recurrence)');
+    if (_currentData.yearCovered == null) addMissing(6, 'Year Covered');
+    if (_currentData.receivedCommodity == null || _currentData.receivedCommodity!.trim().isEmpty) addMissing(6, 'Received Commodity');
+
+    // Step 7 - Monthly Income
+    if (_currentData.agriRelatedIncome == null) addMissing(7, 'Agri-Related Income');
+    if (_currentData.saadNetIncome == null) addMissing(7, 'SAAD Net Income');
+    if (_currentData.nonAgriRelatedIncome == null) addMissing(7, 'Non-Agri Related Income');
+    if (_currentData.mainSourcesOfIncome == null || _currentData.mainSourcesOfIncome!.trim().isEmpty) addMissing(7, 'Main Sources of Income');
+
+    // Step 8 - Signature
+    if (_currentData.idType == null || _currentData.idType!.trim().isEmpty) addMissing(8, 'ID Type');
+    if (_currentData.idFrontImagePath == null || _currentData.idFrontImagePath!.trim().isEmpty) addMissing(8, 'ID Front Photo');
+    if (_currentData.idBackImagePath == null || _currentData.idBackImagePath!.trim().isEmpty) addMissing(8, 'ID Back Photo');
+    if (_currentData.farmerPhotoPath == null || _currentData.farmerPhotoPath!.trim().isEmpty) addMissing(8, 'Farmer Photo');
+    if ((_currentData.signatureImagePath == null || _currentData.signatureImagePath!.trim().isEmpty) && (_currentData.signatureImage == null)) addMissing(8, 'Signature');
+
+    if (missing.isNotEmpty) {
+      // Build a grouped message showing step and fields
+      final buffer = StringBuffer();
+      missing.forEach((step, fields) {
+        buffer.writeln('Step $step:');
+        for (final f in fields) {
+          buffer.writeln(' • $f');
+        }
+        buffer.writeln();
+      });
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cannot Submit — Missing Fields'),
+          content: SingleChildScrollView(child: Text(buffer.toString())),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          ],
+        ),
+      );
+      return; // Prevent submission
+    }
+
+    // All required fields present — proceed to save
+    _currentData.createdAt = _currentData.createdAt ?? DateTime.now();
+
+    // Show staged progress dialog
+    String stageLabel = 'Preparing...';
+    double stageValue = 0.0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(builder: (context, setState) {
+        return AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: stageValue <= 0 ? null : stageValue),
+              const SizedBox(height: 16),
+              Text(stageLabel, style: const TextStyle(fontSize: 14)),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      }),
+    );
+
+    try {
+      // Save locally only (do NOT auto-sync to Firestore). Keep setAsCurrent=false
+      // so this saved profile is treated as an Unsync entry and not the current in-progress draft.
+      await _storage.saveDraftLocally(_currentData, setAsCurrent: false);
+      debugPrint('✅ Saved locally (Unsync): ${_currentData.farmerFolderName}');
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close progress dialog
+
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Saved Locally'),
+          content: const Text('Profile saved locally as Unsync. You can sync later from the Data screen.'),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext); // Close dialog
+                // Mark as successfully submitted so dispose() won't delete it
+                _formSubmittedSuccessfully = true;
+                // Reset form for new entry and navigate back
+                if (!mounted) return;
+                setState(() {
+                  _currentData = ProfilingData();
+                  _currentStep = 1;
+                });
+                if (!mounted) return;
+                Navigator.pop(context); // Go back to previous screen
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // Close progress dialog
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving form: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Build only the current step widget (lazy loading for performance)
+    // Shared _currentData object persists all entered data across step navigation
+    Widget currentStepWidget;
+    
     switch (_currentStep) {
       case 1:
-        return Step01PersonalInfo(
+        currentStepWidget = Step01PersonalInfo(
           onNext: _goToNextStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 2:
-        return Step02AddressInfo(
+        currentStepWidget = Step02AddressInfo(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 3:
-        return Step03OtherPersonal(
+        currentStepWidget = Step03OtherPersonal(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 4:
-        return Step04MainCommodity(
+        currentStepWidget = Step04MainCommodity(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 5:
-        return Step05Recurrence(
+        currentStepWidget = Step05Recurrence(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 6:
-        return Step06MonthlyIncome(
+        currentStepWidget = Step06MonthlyIncome(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 7:
-        return Step07FarmIncome(
+        currentStepWidget = Step07FarmIncome(
           onNext: _goToNextStep,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       case 8:
-        return Step08Signature(
-          onNext: _submitForm, // Final step — submits form
+        currentStepWidget = Step08Signature(
+          onNext: _submitForm,
           onBack: _goToPreviousStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
-
+        break;
       default:
-        return Step01PersonalInfo(
+        currentStepWidget = Step01PersonalInfo(
           onNext: _goToNextStep,
           onHeaderBack: _goToHome,
+          currentData: _currentData,
         );
     }
+
+    return currentStepWidget;
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PROFILING STEP WRAPPER - Shared Layout for All Steps
-// ════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 /// ProfilingStepWrapper
 ///
 /// Shared animated layout shell for every profiling step.
 ///
-/// Structure (top → bottom):
-///   1. Green header   — leaf bg + back arrow + "Profiling" title + subtitle
-///   2. StepperHeader  — animated line progress bar (8 segments)
-///   3. Scrollable body — section title + child form (fade+slide in)
-///   4. Pinned bottom  — Next button (+ optional Back on step ≥ 2)
+/// Structure (top â†’ bottom):
+///   1. Green header   â€” leaf bg + back arrow + "Profiling" title + subtitle
+///   2. StepperHeader  â€” animated line progress bar (8 segments)
+///   3. Scrollable body â€” section title + child form (fade+slide in)
+///   4. Pinned bottom  â€” Next button (+ optional Back on step â‰¥ 2)
 ///
 /// Uses DAColors & DATextStyles throughout.  Form body fades + slides up on build.
 class ProfilingStepWrapper extends StatefulWidget {
@@ -384,7 +596,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
           StepperHeader(currentStep: widget.currentStep),
 
           // ==============================================================
-          // 3. SCROLLABLE FORM BODY  — fade + slide up on entry
+          // 3. SCROLLABLE FORM BODY  â€” fade + slide up on entry
           // ==============================================================
           Expanded(
             child: AnimatedBuilder(
@@ -401,10 +613,10 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               child: Theme(
                 data: Theme.of(context).copyWith(
                   scrollbarTheme: ScrollbarThemeData(
-                    thumbColor: MaterialStateProperty.all(
+                    thumbColor: WidgetStateProperty.all(
                       DAColors.primaryGreen.withOpacity(0.5),
                     ),
-                    thickness: MaterialStateProperty.all(4.0),
+                    thickness: WidgetStateProperty.all(4.0),
                     radius: const Radius.circular(8),
                   ),
                 ),
@@ -440,7 +652,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
           ),
 
           // ==============================================================
-          // 4. PINNED BOTTOM  — Next + optional Back
+          // 4. PINNED BOTTOM  â€” Next + optional Back
           // ==============================================================
           Container(
             color: DAColors.lightGrey,
@@ -454,7 +666,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── NEXT ──
+                // â”€â”€ NEXT â”€â”€
                 GestureDetector(
                   onTap: widget.onNext,
                   child: Container(
@@ -483,7 +695,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                   ),
                 ),
 
-                // ── BACK (step ≥ 2 only) — centred vertically in remaining gap ──
+                // â”€â”€ BACK (step â‰¥ 2 only) â€” centred vertically in remaining gap â”€â”€
                 if (widget.onBack != null) ...[
                   const SizedBox(height: 18),
                   Center(

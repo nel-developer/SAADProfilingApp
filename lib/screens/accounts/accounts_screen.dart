@@ -69,7 +69,42 @@ class _AccountsScreenState extends State<AccountsScreen>
     );
 
     _controller.forward();
-    _loadAccounts();
+    _checkAccessAndLoad();
+  }
+
+  /// Ensure only Admins and Moderators can view this screen
+  Future<void> _checkAccessAndLoad() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final role = await _authService.getUserRole(user.uid);
+    final roleLower = role?.toLowerCase();
+    if (roleLower == null || !(roleLower == 'admin' || roleLower == 'moderator')) {
+      // Not allowed — show restricted dialog then pop
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Restricted'),
+          content: const Text('You do not have access to Accounts.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      return;
+    }
+
+    // Allowed — proceed to load accounts
+    await _loadAccounts();
   }
 
   /// Fetch all users (pending and approved) from Firestore
@@ -107,7 +142,7 @@ class _AccountsScreenState extends State<AccountsScreen>
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading accounts: $e');
+      debugPrint('Error loading accounts: $e');
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

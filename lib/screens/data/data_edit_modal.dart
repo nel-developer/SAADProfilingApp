@@ -1,7 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:da_project_1/theme/da_colors.dart';
+import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 class DataEditModal extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -19,6 +23,7 @@ class DataEditModal extends StatefulWidget {
 
 class _DataEditModalState extends State<DataEditModal> {
   late Map<String, dynamic> _editedData;
+  String _currentUserName = '';
 
   static const double _refWidth = 393.0;
   static const double _refHeight = 852.0;
@@ -74,67 +79,140 @@ class _DataEditModalState extends State<DataEditModal> {
   final TextEditingController _mainSourcesController = TextEditingController();
 
   // Farm Income Controllers - 1 MULTILINE EACH
-  final TextEditingController _primaryAmountController = TextEditingController();
-  final TextEditingController _primaryRemarksController = TextEditingController();
-  final TextEditingController _secondaryAmountController = TextEditingController();
-  final TextEditingController _secondaryRemarksController = TextEditingController();
+  // Specific commodity farm income controllers
+  final TextEditingController _riceIncomeController = TextEditingController();
+  final TextEditingController _riceRemarksController = TextEditingController();
+  final TextEditingController _hvcIncomeController = TextEditingController();
+  final TextEditingController _hvcRemarksController = TextEditingController();
+  final TextEditingController _livestockIncomeController = TextEditingController();
+  final TextEditingController _livestockRemarksController = TextEditingController();
+  final TextEditingController _fishingIncomeController = TextEditingController();
+  final TextEditingController _fishingRemarksController = TextEditingController();
+  final TextEditingController _nonFarmFisheriesIncomeController = TextEditingController();
+  final TextEditingController _nonFarmFisheriesRemarksController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _editedData = Map.from(widget.profileData);
+    _loadCurrentUserName();
 
-    // Initialize ALL fields with dummy data
-    _surnameController.text = 'Dela Cruz';
-    _firstNameController.text = 'Juan';
-    _middleNameController.text = 'Santos';
-    _extensionNameController.text = 'JR';
-    _sexController.text = 'Male';
-    _dobController.text = '11/01/1999';
+    final incoming = widget.profileData['data'];
+    if (incoming is ProfilingData) {
+      final pd = incoming;
+      _surnameController.text = pd.surname ?? '';
+      _firstNameController.text = pd.firstName ?? '';
+      _middleNameController.text = pd.middleName ?? '';
+      _extensionNameController.text = pd.extensionName ?? '';
+      _sexController.text = pd.sex ?? '';
+      _dobController.text = pd.dateOfBirth ?? '';
 
-    _regionController.text = 'IV-A';
-    _provinceController.text = 'Batangas';
-    _municipalityController.text = 'Lipa City';
-    _barangayController.text = 'Sabang';
-    _sitioPurokController.text = 'Purok 1';
+      _regionController.text = pd.region ?? '';
+      _provinceController.text = pd.province ?? '';
+      _municipalityController.text = pd.municipality ?? '';
+      _barangayController.text = pd.barangay ?? '';
+      _sitioPurokController.text = pd.sitioPurok ?? '';
 
-    _indigenousGroupController.text = 'Yes';
-    _pwdController.text = 'Yes';
-    _indigenousSpecifyController.text = '___________';
-    _spouseNameController.text = '___________';
+      _indigenousGroupController.text = (pd.isIndigenous == true) ? 'Yes' : 'No';
+      _pwdController.text = (pd.isPWD == true) ? 'Yes' : 'No';
+      _indigenousSpecifyController.text = pd.indigenousGroup ?? '';
+      _spouseNameController.text = pd.spouseName ?? '';
 
-    _primaryCommodityController.text = 'Others';
-    _secondaryCommodityController.text = 'Others';
-    _primarySpecifyController.text = '___________';
-    _secondarySpecifyController.text = '___________';
+      _primaryCommodityController.text = pd.primaryCommodity ?? '';
+      _secondaryCommodityController.text = pd.secondaryCommodity ?? '';
+      _primarySpecifyController.text = pd.primaryCommodityOthers ?? '';
+      _secondarySpecifyController.text = pd.secondaryCommodityOthers ?? '';
 
-    _organizationNameController.text = 'Mahika';
-    _positionController.text = 'Others';
-    _dateMembershipController.text = '11/12/25';
-    _positionSpecifyController.text = '___________';
+      _organizationNameController.text = pd.cooperativeName ?? '';
+      _positionController.text = pd.cooperativePosition ?? '';
+      _dateMembershipController.text = pd.dateOfMembership ?? '';
+      _positionSpecifyController.text = pd.cooperativePositionOthers ?? '';
 
-    // Recurrence data (current year)
-    _recPrimaryController.text = 'Others';
-    _recSecondaryController.text = 'Others';
-    _recPrimarySpecifyController.text = '___________';
-    _recSecondarySpecifyController.text = '___________';
-    _familyMaleController.text = '2';
-    _familyFemaleController.text = '2';
-    _landTenureshipController.text = 'Others';
-    _landTenureshipSpecifyController.text = '___________';
-    _yearsFishingController.text = '5';
+      // Recurrence data (use booleans/texts if present)
+      _recPrimaryController.text = (pd.primaryCommodityRecurrence == true) ? 'Yes' : 'No';
+      _recSecondaryController.text = pd.secondaryCommodityRecurrence ?? '';
+      _recPrimarySpecifyController.text = pd.primaryCommodityRecurrenceOthers ?? '';
+      _recSecondarySpecifyController.text = pd.secondaryCommodityRecurrenceOthers ?? '';
+      _familyMaleController.text = (pd.maleFamilyMembers ?? 0).toString();
+      _familyFemaleController.text = (pd.femaleFamilyMembers ?? 0).toString();
+      _landTenureshipController.text = pd.landTenureship ?? '';
+      _landTenureshipSpecifyController.text = pd.landTenureshipOthers ?? '';
+      _yearsFishingController.text = (pd.yearsInFarming ?? 0).toString();
 
-    // Monthly Income (inside recurrence)
-    _agriRelatedController.text = '₱25,000';
-    _saadNetIncomeController.text = '₱25,000';
-    _nonAgriRelatedController.text = '₱25,000';
-    _mainSourcesController.text = '₱25,000';
+      _agriRelatedController.text = (pd.agriRelatedIncome ?? 0).toString();
+      _saadNetIncomeController.text = (pd.saadNetIncome ?? 0).toString();
+      _nonAgriRelatedController.text = (pd.nonAgriRelatedIncome ?? 0).toString();
+      _mainSourcesController.text = pd.mainSourcesOfIncome ?? '';
 
-    // Initialize farm income with MULTILINE data
-    _primaryAmountController.text = '₱25,000\n+₱25,000\n₱25,000';
-    _primaryRemarksController.text = '';
-    _secondaryAmountController.text = '₱25,000\n+₱25,000\n₱25,000';
-    _secondaryRemarksController.text = '';
+      _riceIncomeController.text = pd.riceIncomeField ?? '';
+      _riceRemarksController.text = pd.riceRemarks ?? '';
+      _hvcIncomeController.text = pd.hvcIncomeField ?? '';
+      _hvcRemarksController.text = pd.hvcRemarks ?? '';
+      _livestockIncomeController.text = pd.livestockIncomeField ?? '';
+      _livestockRemarksController.text = pd.livestockRemarks ?? '';
+      _fishingIncomeController.text = pd.fishingIncomeField ?? '';
+      _fishingRemarksController.text = pd.fishingRemarks ?? '';
+      _nonFarmFisheriesIncomeController.text = pd.nonFarmFisheriesIncomeField ?? '';
+      _nonFarmFisheriesRemarksController.text = pd.nonFarmFisheriesRemarks ?? '';
+    } else {
+      // Fallback dummy values
+      _surnameController.text = 'Dela Cruz';
+      _firstNameController.text = 'Juan';
+      _middleNameController.text = 'Santos';
+      _extensionNameController.text = 'JR';
+      _sexController.text = 'Male';
+      _dobController.text = '11/01/1999';
+
+      _regionController.text = 'IV-A';
+      _provinceController.text = 'Batangas';
+      _municipalityController.text = 'Lipa City';
+      _barangayController.text = 'Sabang';
+      _sitioPurokController.text = 'Purok 1';
+
+      _indigenousGroupController.text = 'Yes';
+      _pwdController.text = 'Yes';
+      _indigenousSpecifyController.text = '___________';
+      _spouseNameController.text = '___________';
+
+      _primaryCommodityController.text = 'Others';
+      _secondaryCommodityController.text = 'Others';
+      _primarySpecifyController.text = '___________';
+      _secondarySpecifyController.text = '___________';
+
+      _organizationNameController.text = 'Mahika';
+      _positionController.text = 'Others';
+      _dateMembershipController.text = '11/12/25';
+      _positionSpecifyController.text = '___________';
+
+      // Recurrence data (current year)
+      _recPrimaryController.text = 'Others';
+      _recSecondaryController.text = 'Others';
+      _recPrimarySpecifyController.text = '___________';
+      _recSecondarySpecifyController.text = '___________';
+      _familyMaleController.text = '2';
+      _familyFemaleController.text = '2';
+      _landTenureshipController.text = 'Others';
+      _landTenureshipSpecifyController.text = '___________';
+      _yearsFishingController.text = '5';
+
+      // Monthly Income (inside recurrence)
+      _agriRelatedController.text = '25000';
+      _saadNetIncomeController.text = '25000';
+      _nonAgriRelatedController.text = '25000';
+      _mainSourcesController.text = 'Farming';
+
+      // Initialize farm income with MULTILINE data for specific commodities
+      _riceIncomeController.text = '25000';
+      _riceRemarksController.text = '';
+      _hvcIncomeController.text = '0';
+      _hvcRemarksController.text = '';
+      _livestockIncomeController.text = '0';
+      _livestockRemarksController.text = '';
+      _fishingIncomeController.text = '0';
+      _fishingRemarksController.text = '';
+      _nonFarmFisheriesIncomeController.text = '0';
+      _nonFarmFisheriesRemarksController.text = '';
+    }
   }
 
   @override
@@ -171,14 +249,17 @@ class _DataEditModalState extends State<DataEditModal> {
     _landTenureshipController.dispose();
     _landTenureshipSpecifyController.dispose();
     _yearsFishingController.dispose();
-    _agriRelatedController.dispose();
-    _saadNetIncomeController.dispose();
-    _nonAgriRelatedController.dispose();
-    _mainSourcesController.dispose();
-    _primaryAmountController.dispose();
-    _primaryRemarksController.dispose();
-    _secondaryAmountController.dispose();
-    _secondaryRemarksController.dispose();
+
+    _riceIncomeController.dispose();
+    _riceRemarksController.dispose();
+    _hvcIncomeController.dispose();
+    _hvcRemarksController.dispose();
+    _livestockIncomeController.dispose();
+    _livestockRemarksController.dispose();
+    _fishingIncomeController.dispose();
+    _fishingRemarksController.dispose();
+    _nonFarmFisheriesIncomeController.dispose();
+    _nonFarmFisheriesRemarksController.dispose();
     super.dispose();
   }
 
@@ -190,7 +271,120 @@ class _DataEditModalState extends State<DataEditModal> {
     return min(scaleW, scaleH);
   }
 
-  void _saveChanges() {
+  Future<void> _loadCurrentUserName() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (userDoc.exists) {
+          final firstName = userDoc.data()?['firstName'] ?? 'User';
+          final lastName = userDoc.data()?['surname'] ?? '';
+          setState(() {
+            _currentUserName = '$firstName $lastName'.trim();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user name: $e');
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    final incoming = widget.profileData['data'];
+    ProfilingData pd;
+    if (incoming is ProfilingData) {
+      pd = incoming;
+    } else {
+      pd = ProfilingData();
+    }
+
+    // Update fields from controllers (minimal set)
+    pd.surname = _surnameController.text;
+    pd.firstName = _firstNameController.text;
+    pd.middleName = _middleNameController.text;
+    pd.extensionName = _extensionNameController.text;
+    pd.sex = _sexController.text;
+    pd.dateOfBirth = _dobController.text;
+
+    pd.region = _regionController.text;
+    pd.province = _provinceController.text;
+    pd.municipality = _municipalityController.text;
+    pd.barangay = _barangayController.text;
+    pd.sitioPurok = _sitioPurokController.text;
+
+    pd.isIndigenous = _indigenousGroupController.text.toLowerCase() == 'yes';
+    pd.indigenousGroup = _indigenousSpecifyController.text;
+    pd.isPWD = _pwdController.text.toLowerCase() == 'yes';
+    pd.spouseName = _spouseNameController.text;
+
+    pd.primaryCommodity = _primaryCommodityController.text;
+    pd.primaryCommodityOthers = _primarySpecifyController.text;
+    pd.secondaryCommodity = _secondaryCommodityController.text;
+    pd.secondaryCommodityOthers = _secondarySpecifyController.text;
+
+    pd.cooperativeName = _organizationNameController.text;
+    pd.cooperativePosition = _positionController.text;
+    pd.dateOfMembership = _dateMembershipController.text;
+    pd.cooperativePositionOthers = _positionSpecifyController.text;
+
+    pd.primaryCommodityRecurrence = _recPrimaryController.text.toLowerCase() == 'yes';
+    pd.secondaryCommodityRecurrence = _recSecondaryController.text;
+    pd.primaryCommodityRecurrenceOthers = _recPrimarySpecifyController.text;
+    pd.secondaryCommodityRecurrenceOthers = _recSecondarySpecifyController.text;
+    pd.maleFamilyMembers = int.tryParse(_familyMaleController.text) ?? pd.maleFamilyMembers;
+    pd.femaleFamilyMembers = int.tryParse(_familyFemaleController.text) ?? pd.femaleFamilyMembers;
+    pd.landTenureship = _landTenureshipController.text;
+    pd.landTenureshipOthers = _landTenureshipSpecifyController.text;
+    pd.yearsInFarming = int.tryParse(_yearsFishingController.text) ?? pd.yearsInFarming;
+
+    pd.agriRelatedIncome = double.tryParse(_agriRelatedController.text) ?? pd.agriRelatedIncome;
+    pd.saadNetIncome = double.tryParse(_saadNetIncomeController.text) ?? pd.saadNetIncome;
+    pd.nonAgriRelatedIncome = double.tryParse(_nonAgriRelatedController.text) ?? pd.nonAgriRelatedIncome;
+    pd.mainSourcesOfIncome = _mainSourcesController.text;
+
+    pd.riceIncomeField = _riceIncomeController.text;
+    pd.riceRemarks = _riceRemarksController.text;
+    pd.hvcIncomeField = _hvcIncomeController.text;
+    pd.hvcRemarks = _hvcRemarksController.text;
+    pd.livestockIncomeField = _livestockIncomeController.text;
+    pd.livestockRemarks = _livestockRemarksController.text;
+    pd.fishingIncomeField = _fishingIncomeController.text;
+    pd.fishingRemarks = _fishingRemarksController.text;
+    pd.nonFarmFisheriesIncomeField = _nonFarmFisheriesIncomeController.text;
+    pd.nonFarmFisheriesRemarks = _nonFarmFisheriesRemarksController.text;
+
+    // Persist updated draft: prefer updating Firestore pending doc first (so ids are assigned),
+    // then save locally under the draft_<id> key. If offline, fall back to local save but
+    // ensure we reuse any existing ids to avoid creating duplicate drafts.
+    final storage = ProfilingStorageService();
+    await storage.init();
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final success = await storage.saveToPendingCollection(pd, user.uid, onProgress: (stage, progress) {
+          debugPrint('🔁 Sync stage: $stage (${progress ?? 0})');
+        });
+        if (!success) {
+          debugPrint('⚠️ Remote save returned false, will persist locally');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Could not sync to pending: $e');
+      }
+    }
+
+    // Ensure local id uses firebase id if available to prevent autosave duplication
+    if ((pd.tempIdLocal == null || pd.tempIdLocal!.isEmpty) && (pd.tempIdFirebase != null && pd.tempIdFirebase!.isNotEmpty)) {
+      pd.tempIdLocal = pd.tempIdFirebase;
+    }
+
+    // Save locally (do NOT set as current in-progress draft)
+    await storage.saveDraftLocally(pd, setAsCurrent: false);
+
+    if (!mounted) return;
     Navigator.pop(context);
     widget.onSave(_editedData);
   }
@@ -247,7 +441,9 @@ class _DataEditModalState extends State<DataEditModal> {
                     ),
                     const Spacer(),
                     Text(
-                      'Edit Profile',
+                      _currentUserName.isEmpty 
+                        ? 'Edit Profile' 
+                        : 'Edit Profile - $_currentUserName',
                       style: GoogleFonts.poppins(
                         fontSize: headerTitleSize,
                         fontWeight: FontWeight.w600,
@@ -371,10 +567,15 @@ class _DataEditModalState extends State<DataEditModal> {
                       scale,
                     ),
                     SizedBox(height: 12 * scale),
-                    _buildEditRow(
+                    _buildSingleEditField(
                       'If yes, please specify',
                       _indigenousSpecifyController,
-                      'Spouse Name',
+                      labelFontSize,
+                      scale,
+                    ),
+                    SizedBox(height: 12 * scale),
+                    _buildSingleEditField(
+                      'Spouse Name (if applicable)',
                       _spouseNameController,
                       labelFontSize,
                       scale,
@@ -687,9 +888,25 @@ class _DataEditModalState extends State<DataEditModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// PRIMARY COMMODITY
+        _buildCommodityEdit('Rice / Corn', _riceIncomeController, _riceRemarksController, labelFontSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityEdit('HVC', _hvcIncomeController, _hvcRemarksController, labelFontSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityEdit('Livestock', _livestockIncomeController, _livestockRemarksController, labelFontSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityEdit('Fishing', _fishingIncomeController, _fishingRemarksController, labelFontSize, scale),
+        SizedBox(height: 12 * scale),
+        _buildCommodityEdit('Non-Farm Fisheries', _nonFarmFisheriesIncomeController, _nonFarmFisheriesRemarksController, labelFontSize, scale),
+      ],
+    );
+  }
+
+  Widget _buildCommodityEdit(String title, TextEditingController incomeCtrl, TextEditingController remarksCtrl, double labelFontSize, double scale) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
-          'Primary Commodity',
+          title,
           style: GoogleFonts.poppins(
             fontSize: labelFontSize + 2 * scale,
             fontWeight: FontWeight.w700,
@@ -697,53 +914,9 @@ class _DataEditModalState extends State<DataEditModal> {
           ),
         ),
         SizedBox(height: 8 * scale),
-
-        _buildTextField(
-          'Amount (one per line)',
-          _primaryAmountController,
-          labelFontSize,
-          scale,
-          maxLines: 5,
-        ),
+        _buildTextField('Amount (one per line)', incomeCtrl, labelFontSize, scale, maxLines: 5),
         SizedBox(height: 12 * scale),
-
-        _buildTextField(
-          'Remarks',
-          _primaryRemarksController,
-          labelFontSize,
-          scale,
-          maxLines: 3,
-        ),
-
-        SizedBox(height: 20 * scale),
-
-        /// SECONDARY COMMODITY
-        Text(
-          'Secondary Commodity',
-          style: GoogleFonts.poppins(
-            fontSize: labelFontSize + 2 * scale,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 8 * scale),
-
-        _buildTextField(
-          'Amount (one per line)',
-          _secondaryAmountController,
-          labelFontSize,
-          scale,
-          maxLines: 5,
-        ),
-        SizedBox(height: 12 * scale),
-
-        _buildTextField(
-          'Remarks',
-          _secondaryRemarksController,
-          labelFontSize,
-          scale,
-          maxLines: 3,
-        ),
+        _buildTextField('Remarks', remarksCtrl, labelFontSize, scale, maxLines: 3),
       ],
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:da_project_1/routes/app_routes.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'package:da_project_1/screens/home/home_screen.dart';
 import 'package:da_project_1/screens/data/data_screen.dart';
 import 'package:da_project_1/theme/da_colors.dart';
@@ -13,6 +14,7 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int _selectedIndex = 0;
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -23,13 +25,40 @@ class _MainScaffoldState extends State<MainScaffold> {
   void _onItemTapped(int index) {
     /// LOGOUT
     if (index == 2) {
-      Navigator.pushReplacementNamed(context, AppRoutes.login);
+      _confirmLogout();
       return;
     }
 
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  void _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      try {
+        await _authService.signOut();
+      } catch (_) {}
+      if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
   }
 
   @override

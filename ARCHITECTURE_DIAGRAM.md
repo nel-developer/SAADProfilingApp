@@ -146,7 +146,7 @@ ProfilingData {
   isIndigenous:   bool
   indigenousGroup:String?
   isPWD:          bool
-  maritalStatus:  String
+     maritalStatus:  (removed)
   spouseName:     String? (only if married)
   
   // Step 4: Commodity

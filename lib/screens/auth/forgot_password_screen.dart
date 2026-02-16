@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'dart:math';
 
@@ -109,31 +110,63 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
     setState(() => _isLoading = true);
 
-    // TODO: Implement Firebase password reset
-    // await FirebaseAuth.instance.sendPasswordResetEmail(
-    //   email: _emailController.text.trim(),
-    // );
+    try {
+      // Send Firebase password reset email
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
+      );
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+      setState(() => _isLoading = false);
 
-    setState(() => _isLoading = false);
+      if (!mounted) return;
 
-    if (!mounted) return;
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Password reset link sent! Check your email.'),
+          backgroundColor: DAColors.primaryGreen,
+          duration: const Duration(seconds: 3),
+        ),
+      );
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Password reset link sent! Check your email.'),
-        backgroundColor: DAColors.primaryGreen,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      // Go back to login after 2 seconds
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      setState(() => _isLoading = false);
 
-    // Go back to login after 2 seconds
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    Navigator.pop(context);
+      String errorMessage = 'An error occurred';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else {
+        errorMessage = e.message ?? 'Failed to send reset email';
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class FirebaseRoleService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -12,7 +13,7 @@ class FirebaseRoleService {
           await _firestore.collection('users').doc(uid).get();
       return doc['role'] as String?;
     } catch (e) {
-      print('Error fetching user role: $e');
+      debugPrint('Error fetching user role: $e');
       return null;
     }
   }
@@ -46,7 +47,7 @@ class FirebaseRoleService {
               })
           .toList();
     } catch (e) {
-      print('Error fetching users: $e');
+      debugPrint('Error fetching users: $e');
       return [];
     }
   }

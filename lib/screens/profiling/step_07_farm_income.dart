@@ -2,24 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
+import 'package:da_project_1/models/profiling_data.dart';
 
-/// Step 7 of 8 — Farm/Fisheries Income
+/// Step 5 of 8 — Farm/Fisheries Income
 ///
 /// Sections:
-///   1. Primary Commodity — expandable amount field + expandable remarks field
-///   2. Secondary Commodity — expandable amount field + expandable remarks field
+///   1. Rice/Corn — expandable income field + expandable remarks field
+///   2. HVC — expandable income field + expandable remarks field
+///   3. Livestock — expandable income field + expandable remarks field
+///   4. Fishing — expandable income field + expandable remarks field
+///   5. Non-Farm Fisheries — expandable income field + expandable remarks field
 ///
 /// All fields are multiline and auto-expand as user types.
 class Step07FarmIncome extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback? onBack;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step07FarmIncome({
     super.key,
     required this.onNext,
     this.onBack,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -27,18 +33,122 @@ class Step07FarmIncome extends StatefulWidget {
 }
 
 class _Step07FarmIncomeState extends State<Step07FarmIncome> {
-  final TextEditingController _primaryAmountCtrl = TextEditingController();
-  final TextEditingController _primaryRemarksCtrl = TextEditingController();
-  final TextEditingController _secondaryAmountCtrl = TextEditingController();
-  final TextEditingController _secondaryRemarksCtrl = TextEditingController();
+  // Controllers for Rice/Corn
+  final TextEditingController _riceIncomeCtrl = TextEditingController();
+  final TextEditingController _riceRemarksCtrl = TextEditingController();
+  
+  // Controllers for HVC
+  final TextEditingController _hvcIncomeCtrl = TextEditingController();
+  final TextEditingController _hvcRemarksCtrl = TextEditingController();
+  
+  // Controllers for Livestock
+  final TextEditingController _livestockIncomeCtrl = TextEditingController();
+  final TextEditingController _livestockRemarksCtrl = TextEditingController();
+  
+  // Controllers for Fishing
+  final TextEditingController _fishingIncomeCtrl = TextEditingController();
+  final TextEditingController _fishingRemarksCtrl = TextEditingController();
+  
+  // Controllers for Non-Farm Fisheries
+  final TextEditingController _nonFarmFisheriesIncomeCtrl = TextEditingController();
+  final TextEditingController _nonFarmFisheriesRemarksCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners only once in initState to prevent duplicates
+    _riceIncomeCtrl.addListener(_autoSaveToCurrentData);
+    _riceRemarksCtrl.addListener(_autoSaveToCurrentData);
+    _hvcIncomeCtrl.addListener(_autoSaveToCurrentData);
+    _hvcRemarksCtrl.addListener(_autoSaveToCurrentData);
+    _livestockIncomeCtrl.addListener(_autoSaveToCurrentData);
+    _livestockRemarksCtrl.addListener(_autoSaveToCurrentData);
+    _fishingIncomeCtrl.addListener(_autoSaveToCurrentData);
+    _fishingRemarksCtrl.addListener(_autoSaveToCurrentData);
+    _nonFarmFisheriesIncomeCtrl.addListener(_autoSaveToCurrentData);
+    _nonFarmFisheriesRemarksCtrl.addListener(_autoSaveToCurrentData);
+    _loadData();
+  }
+
+  @override
+  void didUpdateWidget(Step07FarmIncome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step via back button
+    _loadData();
+  }
+
+  void _loadData() {
+    if (widget.currentData != null) {
+      _riceIncomeCtrl.text = widget.currentData!.riceIncomeField ?? '';
+      _riceRemarksCtrl.text = widget.currentData!.riceRemarks ?? '';
+      
+      _hvcIncomeCtrl.text = widget.currentData!.hvcIncomeField ?? '';
+      _hvcRemarksCtrl.text = widget.currentData!.hvcRemarks ?? '';
+      
+      _livestockIncomeCtrl.text = widget.currentData!.livestockIncomeField ?? '';
+      _livestockRemarksCtrl.text = widget.currentData!.livestockRemarks ?? '';
+      
+      _fishingIncomeCtrl.text = widget.currentData!.fishingIncomeField ?? '';
+      _fishingRemarksCtrl.text = widget.currentData!.fishingRemarks ?? '';
+      
+      _nonFarmFisheriesIncomeCtrl.text = widget.currentData!.nonFarmFisheriesIncomeField ?? '';
+      _nonFarmFisheriesRemarksCtrl.text = widget.currentData!.nonFarmFisheriesRemarks ?? '';
+    }
+  }
+
+  void _autoSaveToCurrentData() {
+    if (widget.currentData != null) {
+      widget.currentData!.riceIncomeField = _riceIncomeCtrl.text.trim();
+      widget.currentData!.riceRemarks = _riceRemarksCtrl.text.trim();
+      
+      widget.currentData!.hvcIncomeField = _hvcIncomeCtrl.text.trim();
+      widget.currentData!.hvcRemarks = _hvcRemarksCtrl.text.trim();
+      
+      widget.currentData!.livestockIncomeField = _livestockIncomeCtrl.text.trim();
+      widget.currentData!.livestockRemarks = _livestockRemarksCtrl.text.trim();
+      
+      widget.currentData!.fishingIncomeField = _fishingIncomeCtrl.text.trim();
+      widget.currentData!.fishingRemarks = _fishingRemarksCtrl.text.trim();
+      
+      widget.currentData!.nonFarmFisheriesIncomeField = _nonFarmFisheriesIncomeCtrl.text.trim();
+      widget.currentData!.nonFarmFisheriesRemarks = _nonFarmFisheriesRemarksCtrl.text.trim();
+    }
+  }
 
   @override
   void dispose() {
-    _primaryAmountCtrl.dispose();
-    _primaryRemarksCtrl.dispose();
-    _secondaryAmountCtrl.dispose();
-    _secondaryRemarksCtrl.dispose();
+    _riceIncomeCtrl.dispose();
+    _riceRemarksCtrl.dispose();
+    _hvcIncomeCtrl.dispose();
+    _hvcRemarksCtrl.dispose();
+    _livestockIncomeCtrl.dispose();
+    _livestockRemarksCtrl.dispose();
+    _fishingIncomeCtrl.dispose();
+    _fishingRemarksCtrl.dispose();
+    _nonFarmFisheriesIncomeCtrl.dispose();
+    _nonFarmFisheriesRemarksCtrl.dispose();
     super.dispose();
+  }
+
+  void _handleNext() {
+    // Save without per-step validation (final validation happens on submit)
+    if (widget.currentData != null) {
+      widget.currentData!.riceIncomeField = _riceIncomeCtrl.text.trim();
+      widget.currentData!.riceRemarks = _riceRemarksCtrl.text.trim();
+      
+      widget.currentData!.hvcIncomeField = _hvcIncomeCtrl.text.trim();
+      widget.currentData!.hvcRemarks = _hvcRemarksCtrl.text.trim();
+      
+      widget.currentData!.livestockIncomeField = _livestockIncomeCtrl.text.trim();
+      widget.currentData!.livestockRemarks = _livestockRemarksCtrl.text.trim();
+      
+      widget.currentData!.fishingIncomeField = _fishingIncomeCtrl.text.trim();
+      widget.currentData!.fishingRemarks = _fishingRemarksCtrl.text.trim();
+      
+      widget.currentData!.nonFarmFisheriesIncomeField = _nonFarmFisheriesIncomeCtrl.text.trim();
+      widget.currentData!.nonFarmFisheriesRemarks = _nonFarmFisheriesRemarksCtrl.text.trim();
+    }
+    widget.onNext();
   }
 
   @override
@@ -53,69 +163,124 @@ class _Step07FarmIncomeState extends State<Step07FarmIncome> {
     final double labelFieldGap = isLargeTablet ? 8.0 : 6.0;
 
     return ProfilingStepWrapper(
-      currentStep: 7,
+      currentStep: 5,
       sectionTitle: 'FARM/FISHERIES INCOME',
-      onNext: widget.onNext,
+      onNext: _handleNext,
       onBack: widget.onBack,
       onHeaderBack: widget.onHeaderBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ══════════════════════════════════════════════════════════
-          // 1. PRIMARY COMMODITY SECTION
+          // 1. RICE/CORN SECTION
           // ══════════════════════════════════════════════════════════
-          _label('Primary Commodity', labelSize),
-          SizedBox(height: labelFieldGap),
-          
-          // Primary Amount (expandable)
-          _expandableField(
-            controller: _primaryAmountCtrl,
-            hint: 'Enter Amount',
-            minLines: 3,
-            keyboardType: TextInputType.multiline,
-          ),
-
-          SizedBox(height: fieldGap),
-
-          // Primary Remarks (expandable)
-          _label('Remarks', labelSize),
-          SizedBox(height: labelFieldGap),
-          _expandableField(
-            controller: _primaryRemarksCtrl,
-            hint: 'Enter Remarks',
-            minLines: 5,
-            keyboardType: TextInputType.multiline,
+          _buildCommoditySection(
+            commodityName: 'Rice/Corn',
+            incomeController: _riceIncomeCtrl,
+            remarksController: _riceRemarksCtrl,
+            labelSize: labelSize,
+            labelFieldGap: labelFieldGap,
+            fieldGap: fieldGap,
           ),
 
           SizedBox(height: sectionGap),
 
           // ══════════════════════════════════════════════════════════
-          // 2. SECONDARY COMMODITY SECTION
+          // 2. HVC SECTION
           // ══════════════════════════════════════════════════════════
-          _label('Secondary Commodity', labelSize),
-          SizedBox(height: labelFieldGap),
-          
-          // Secondary Amount (expandable)
-          _expandableField(
-            controller: _secondaryAmountCtrl,
-            hint: 'Enter Amount',
-            minLines: 3,
-            keyboardType: TextInputType.multiline,
+          _buildCommoditySection(
+            commodityName: 'HVC',
+            incomeController: _hvcIncomeCtrl,
+            remarksController: _hvcRemarksCtrl,
+            labelSize: labelSize,
+            labelFieldGap: labelFieldGap,
+            fieldGap: fieldGap,
           ),
 
-          SizedBox(height: fieldGap),
+          SizedBox(height: sectionGap),
 
-          // Secondary Remarks (expandable)
-          _label('Remarks', labelSize),
-          SizedBox(height: labelFieldGap),
-          _expandableField(
-            controller: _secondaryRemarksCtrl,
-            hint: 'Enter Remarks',
-            minLines: 5,
-            keyboardType: TextInputType.multiline,
+          // ══════════════════════════════════════════════════════════
+          // 3. LIVESTOCK SECTION
+          // ══════════════════════════════════════════════════════════
+          _buildCommoditySection(
+            commodityName: 'Livestock',
+            incomeController: _livestockIncomeCtrl,
+            remarksController: _livestockRemarksCtrl,
+            labelSize: labelSize,
+            labelFieldGap: labelFieldGap,
+            fieldGap: fieldGap,
+          ),
+
+          SizedBox(height: sectionGap),
+
+          // ══════════════════════════════════════════════════════════
+          // 4. FISHING SECTION
+          // ══════════════════════════════════════════════════════════
+          _buildCommoditySection(
+            commodityName: 'Fishing',
+            incomeController: _fishingIncomeCtrl,
+            remarksController: _fishingRemarksCtrl,
+            labelSize: labelSize,
+            labelFieldGap: labelFieldGap,
+            fieldGap: fieldGap,
+          ),
+
+          SizedBox(height: sectionGap),
+
+          // ══════════════════════════════════════════════════════════
+          // 5. NON-FARM FISHERIES SECTION
+          // ══════════════════════════════════════════════════════════
+          _buildCommoditySection(
+            commodityName: 'Non-Farm Fisheries',
+            incomeController: _nonFarmFisheriesIncomeCtrl,
+            remarksController: _nonFarmFisheriesRemarksCtrl,
+            labelSize: labelSize,
+            labelFieldGap: labelFieldGap,
+            fieldGap: fieldGap,
           ),
         ],
       ),
+    );
+  }
+
+  /// Build a complete commodity section with commodity name, income field, and remarks field
+  Widget _buildCommoditySection({
+    required String commodityName,
+    required TextEditingController incomeController,
+    required TextEditingController remarksController,
+    required double labelSize,
+    required double labelFieldGap,
+    required double fieldGap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Commodity Name Label
+        _label(commodityName, labelSize),
+        SizedBox(height: labelFieldGap),
+
+        // Income Field
+        _label('Income Breakdown', labelSize * 0.85),
+        SizedBox(height: labelFieldGap),
+        _expandableField(
+          controller: incomeController,
+          hint: 'Enter Income Breakdown',
+          minLines: 3,
+          keyboardType: TextInputType.multiline,
+        ),
+
+        SizedBox(height: fieldGap),
+
+        // Remarks Field
+        _label('Remarks', labelSize * 0.85),
+        SizedBox(height: labelFieldGap),
+        _expandableField(
+          controller: remarksController,
+          hint: 'Enter Remarks',
+          minLines: 5,
+          keyboardType: TextInputType.multiline,
+        ),
+      ],
     );
   }
 

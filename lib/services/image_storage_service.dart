@@ -1,6 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:convert' show JsonEncoder;
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 /// ImageStorageService — Organizes all images per farmer locally
 ///
@@ -21,7 +23,7 @@ class ImageStorageService {
   static const String _appFolderName = 'SAADProfiling';
 
   /// Get the base directory for storing profiling data
-  Future<Directory> _getAppDirectory() async {
+  Future<Directory> getAppDirectory() async {
     final externalDir = await getExternalStorageDirectory();
     if (externalDir == null) {
       throw Exception('Cannot access external storage');
@@ -37,7 +39,7 @@ class ImageStorageService {
   /// Get/Create farmer-specific folder
   /// folderName format: "firstname_lastname_uniqueid" (e.g., "juan_dela_cruz_12345")
   Future<Directory> _getFarmerFolder(String farmerFolderName) async {
-    final appDir = await _getAppDirectory();
+    final appDir = await getAppDirectory();
     final farmerDir = Directory('${appDir.path}/$farmerFolderName');
 
     if (!await farmerDir.exists()) {
@@ -48,7 +50,7 @@ class ImageStorageService {
 
   /// Generate sanitized folder name for farmer from first and last name
   /// Input: "Juan Dela Cruz"
-  /// Output: "juan_dela_cruz_<timestamp>"
+  /// Output: "juan_dela_cruz_timestamp"
   String generateFarmerFolderName(String firstName, String lastName, {String? uniqueId}) {
     final sanitizedFirst = firstName.replaceAll(' ', '_').toLowerCase();
     final sanitizedLast = lastName.replaceAll(' ', '_').toLowerCase();
@@ -57,7 +59,7 @@ class ImageStorageService {
   }
 
   /// Generate sanitized folder name from full name string
-  /// Example: "Juan S. Dela Cruz" -> "juan_s_dela_cruz_<timestamp>"
+  /// Example: "Juan S. Dela Cruz" -> "juan_s_dela_cruz_timestamp"
   String generateFarmerFolderNameFromFullName(String fullName, {String? uniqueId}) {
     final sanitized = fullName
         .replaceAll(RegExp(r'\s+'), '_')
@@ -105,12 +107,22 @@ class ImageStorageService {
 
       final filePath = '${farmerDir.path}/${baseName}_signature.png';
       final file = File(filePath);
+
       await file.writeAsBytes(imageData);
 
-      print('✅ Signature saved: $filePath');
+      // Verify file was successfully saved
+      if (!await file.exists()) {
+        throw Exception('Signature file was written but does not exist at: $filePath');
+      }
+
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        throw Exception('Signature file saved but is empty at: $filePath');
+      }
+      debugPrint('✅ Signature saved: $filePath');
       return filePath;
     } catch (e) {
-      print('❌ Error saving signature: $e');
+      debugPrint('❌ Error saving signature: $e');
       rethrow;
     }
   }
@@ -130,15 +142,31 @@ class ImageStorageService {
         baseName = _extractBaseName(farmerFolderName);
       }
 
-      final fileName = '$baseName$suffix.jpg';
+      // Preserve original file extension if available (avoid renaming HEIC/WEBP to .jpg)
+      final originalExt = p.extension(imageFile.path).toLowerCase();
+      final ext = (originalExt.isEmpty) ? '.jpg' : originalExt;
+      final fileName = '$baseName$suffix$ext';
       final targetPath = '${farmerDir.path}/$fileName';
 
-      await imageFile.copy(targetPath);
+      // Read bytes and write to new file to ensure consistent storage across platforms
+      final imageData = await imageFile.readAsBytes();
+      final targetFile = File(targetPath);
+      await targetFile.writeAsBytes(imageData, flush: true);
 
-      print('✅ Image saved: $targetPath');
+      // Verify file was successfully saved
+      final savedFile = File(targetPath);
+      if (!await savedFile.exists()) {
+        throw Exception('File was copied but does not exist at: $targetPath');
+      }
+
+      final fileSize = await savedFile.length();
+      if (fileSize == 0) {
+        throw Exception('File saved but is empty at: $targetPath');
+      }
+      debugPrint('✅ Image saved: $targetPath');
       return targetPath;
     } catch (e) {
-      print('❌ Error saving image: $e');
+      debugPrint('❌ Error saving image: $e');
       rethrow;
     }
   }
@@ -158,7 +186,7 @@ class ImageStorageService {
   /// Get all farmer folders
   Future<List<String>> getAllFarmerFolders() async {
     try {
-      final appDir = await _getAppDirectory();
+      final appDir = await getAppDirectory();
       final entities = await appDir.list().toList();
 
       final folders = entities
@@ -168,7 +196,7 @@ class ImageStorageService {
 
       return folders;
     } catch (e) {
-      print('❌ Error listing farmer folders: $e');
+      debugPrint('❌ Error listing farmer folders: $e');
       return [];
     }
   }
@@ -185,15 +213,16 @@ class ImageStorageService {
           final fileName = entity.path.split(Platform.pathSeparator).last;
           if (fileName.contains('_frontimage')) images['front'] = entity.path;
           if (fileName.contains('_backimage')) images['back'] = entity.path;
-          if (fileName.contains('_profilepicture'))
+          if (fileName.contains('_profilepicture')) {
             images['profile'] = entity.path;
+          }
           if (fileName.contains('_signature')) images['signature'] = entity.path;
         }
       }
 
       return images;
     } catch (e) {
-      print('❌ Error getting farmer images: $e');
+      debugPrint('❌ Error getting farmer images: $e');
       return {};
     }
   }
@@ -204,31 +233,204 @@ class ImageStorageService {
       final farmerDir = await _getFarmerFolder(farmerFolderName);
       if (await farmerDir.exists()) {
         await farmerDir.delete(recursive: true);
-        print('✅ Farmer folder deleted: $farmerFolderName');
+        debugPrint('✅ Farmer folder deleted: $farmerFolderName');
       }
     } catch (e) {
-      print('❌ Error deleting farmer folder: $e');
+      debugPrint('❌ Error deleting farmer folder: $e');
       rethrow;
     }
   }
 
-  /// Save draft JSON to farmer folder
-  Future<void> saveDraftJson(String farmerFolderName, Map<String, dynamic> draftData) async {
+  /// Save profiling data JSON to farmer folder with farmer name in filename
+  /// Follows the same naming pattern as images: {firstName}_{lastName}_profiling_data.json
+  Future<void> saveDraftJson(
+    String farmerFolderName,
+    Map<String, dynamic> draftData, {
+    String? firstName,
+    String? lastName,
+  }) async {
     try {
       final farmerDir = await _getFarmerFolder(farmerFolderName);
-      final draftFile = File('${farmerDir.path}/draft.json');
-      
+
+      // Build filename from first and last name (same pattern as _frontimage, _signature, etc)
+      String fileName;
+      if ((firstName ?? '').isNotEmpty && (lastName ?? '').isNotEmpty) {
+        final sanitizedFirst = firstName!.toLowerCase().replaceAll(' ', '_');
+        final sanitizedLast = lastName!.toLowerCase().replaceAll(' ', '_');
+        fileName = '${sanitizedFirst}_${sanitizedLast}_profiling_data.json';
+      } else {
+        final baseName = _extractBaseName(farmerFolderName);
+        fileName = '${baseName}_profiling_data.json';
+      }
+
+      final draftFile = File('${farmerDir.path}/$fileName');
+
       // Convert map to JSON string with pretty formatting
       final jsonString = const JsonEncoder.withIndent('  ').convert(draftData);
       await draftFile.writeAsString(jsonString);
-      
-      print('✅ Draft JSON saved: ${draftFile.path}');
+
+      // Verify file actually saved
+      if (!await draftFile.exists()) {
+        throw Exception('Draft file was not created at: ${draftFile.path}');
+      }
+
+      debugPrint('✅ Profiling data saved: ${draftFile.path}');
     } catch (e) {
-      print('⚠️ Error saving draft JSON: $e');
-      // Don't rethrow; this is a non-critical operation
+      debugPrint('❌ Error saving profiling data JSON: $e');
+      rethrow; // Propagate error so calling code knows save failed
     }
+  }
+
+  /// Check if an image file exists and is readable
+  Future<bool> imageExists(String? imagePath) async {
+    if (imagePath == null || imagePath.isEmpty) {
+      return false;
+    }
+    try {
+      final file = File(imagePath);
+      final exists = await file.exists();
+      if (exists) {
+        final size = await file.length();
+        return size > 0;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ Error checking image existence at $imagePath: $e');
+      return false;
+    }
+  }
+
+  /// Get image file if it exists, returns null if not valid
+  Future<File?> getImageFile(String? imagePath) async {
+    if (imagePath == null || imagePath.isEmpty) {
+      return null;
+    }
+    try {
+      final file = File(imagePath);
+      if (await file.exists() && await file.length() > 0) {
+        return file;
+      }
+      debugPrint('⚠️ Image file not found or empty: $imagePath');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error accessing image file $imagePath: $e');
+      return null;
+    }
+  }
+
+  /// Save multiple images in parallel using an isolate (non-blocking).
+  /// Useful for saving all 4 images (front ID, back ID, profile photo, signature) at once.
+  /// 
+  /// Params:
+  ///   - farmerFolderName: folder where images are stored
+  ///   - imagesToSave: map of {imageType -> File} e.g., {'front' -> File(...)}
+  ///   - signatureData: optional Uint8List for signature
+  ///   - firstName, lastName: for filename generation
+  /// 
+  /// Returns: map of {imageType -> savedPath}
+  Future<Map<String, String>> saveImageBatch({
+    required String farmerFolderName,
+    Map<String, File>? imagesToSave,
+    Uint8List? signatureData,
+    String? firstName,
+    String? lastName,
+  }) async {
+    final basePath = (await getAppDirectory()).path;
+    final farmerPath = '$basePath/$farmerFolderName';
+    
+    // Prepare batch payload
+    final batchPayload = _ImageBatchPayload(
+      farmerPath: farmerPath,
+      imagesToSave: imagesToSave ?? {},
+      signatureData: signatureData,
+      firstName: firstName,
+      lastName: lastName,
+    );
+    
+    // Offload to isolate
+    final results = await compute(_saveImageBatchWorker, batchPayload);
+    return results;
   }
 }
 
-// Import JsonEncoder for pretty JSON formatting
-import 'dart:convert' show JsonEncoder;
+/// Payload for batch image save (must be serializable)
+class _ImageBatchPayload {
+  final String farmerPath;
+  final Map<String, File> imagesToSave;
+  final Uint8List? signatureData;
+  final String? firstName;
+  final String? lastName;
+
+  _ImageBatchPayload({
+    required this.farmerPath,
+    required this.imagesToSave,
+    this.signatureData,
+    this.firstName,
+    this.lastName,
+  });
+}
+
+/// Isolate worker: save all images in batch.
+/// Runs in background thread and returns {type -> savedPath} map.
+Future<Map<String, String>> _saveImageBatchWorker(_ImageBatchPayload payload) async {
+  final results = <String, String>{};
+  
+  // Ensure farmer directory exists
+  final farmerDir = Directory(payload.farmerPath);
+  if (!farmerDir.existsSync()) {
+    farmerDir.createSync(recursive: true);
+  }
+  
+  // Extract base name for filenames
+  String baseName;
+  if ((payload.firstName ?? '').isNotEmpty && (payload.lastName ?? '').isNotEmpty) {
+    baseName = 
+        '${payload.firstName!.toLowerCase().replaceAll(' ', '_')}_${payload.lastName!.toLowerCase().replaceAll(' ', '_')}';
+  } else {
+    // Extract from folder name (remove timestamp suffix)
+    final parts = payload.farmerPath.split(Platform.pathSeparator).last.split('_');
+    baseName = parts.length > 1 ? parts.sublist(0, parts.length - 1).join('_') : parts.first;
+  }
+  
+  // Save regular image files
+  for (final entry in payload.imagesToSave.entries) {
+    try {
+      final imageFile = entry.value;
+      final imageType = entry.key; // 'front', 'back', 'profile'
+      
+      if (!imageFile.existsSync()) continue;
+      
+      final bytes = imageFile.readAsBytesSync();
+      if (bytes.isEmpty) continue;
+      
+      final ext = p.extension(imageFile.path).toLowerCase();
+      final suffix = imageType == 'front' 
+          ? '_frontimage' 
+          : imageType == 'back' 
+            ? '_backimage' 
+            : '_profilepicture';
+      final fileName = '$baseName$suffix${ext.isEmpty ? '.jpg' : ext}';
+      final targetPath = '${payload.farmerPath}/$fileName';
+      
+      File(targetPath).writeAsBytesSync(bytes);
+      results[imageType] = targetPath;
+    } catch (_) {
+      // silently skip failed individual images
+      continue;
+    }
+  }
+  
+  // Save signature if provided
+  if (payload.signatureData != null && payload.signatureData!.isNotEmpty) {
+    try {
+      final fileName = '${baseName}_signature.png';
+      final targetPath = '${payload.farmerPath}/$fileName';
+      File(targetPath).writeAsBytesSync(payload.signatureData!);
+      results['signature'] = targetPath;
+    } catch (_) {
+      // silently skip signature if it fails
+    }
+  }
+  
+  return results;
+}

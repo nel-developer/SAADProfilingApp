@@ -22,9 +22,10 @@ class ProfilingData {
   bool? isIndigenous;
   String? indigenousGroup;
   bool? isPWD;
-  String? maritalStatus;
   String? spouseName;
-
+  String? tribeEthnicity;
+  
+  
   // Step 4: Main Commodity
   String? primaryCommodity;
   String? primaryCommodityOthers;
@@ -39,6 +40,10 @@ class ProfilingData {
   String? landTenureshipOthers;
   String? secondaryCommodityRecurrence;
   String? secondaryCommodityOthersRecurrence;
+  String? secondaryCommodityRecurrenceOthers;
+  // Recurrence for primary commodity
+  bool? primaryCommodityRecurrence;
+  String? primaryCommodityRecurrenceOthers;
   int? yearCovered;
   String? receivedCommodity;
   String? receivedCommodityOthers;
@@ -54,6 +59,28 @@ class ProfilingData {
   String? primaryRemarks;
   String? secondaryAmount;
   String? secondaryRemarks;
+  String? primaryCommodityIncome;
+  String? primaryCommodityRemarks;
+  String? secondaryCommodityIncome;
+  String? secondaryCommodityRemarks;
+  
+  // Specific commodities income and remarks
+  String? riceIncomeField;
+  String? riceRemarks;
+  String? hvcIncomeField;
+  String? hvcRemarks;
+  String? livestockIncomeField;
+  String? livestockRemarks;
+  String? fishingIncomeField;
+  String? fishingRemarks;
+  String? nonFarmFisheriesIncomeField;
+  String? nonFarmFisheriesRemarks;
+
+  // Farmers/Fishers Cooperative
+  String? cooperativeName;
+  String? cooperativePosition;
+  String? dateOfMembership;
+  String? cooperativePositionOthers;
 
   // Step 8: Signature
   String? idType;
@@ -65,10 +92,15 @@ class ProfilingData {
 
   // Meta
   String? userId;
-  String? farmerFolderName; // Unique folder identifier for organizing images
+  String? status;
+  String? enumeratorEmail;
+  String? approverEmail;
+  DateTime? approvedAt;
+    String? farmerFolderName; // Unique folder identifier for organizing images
+  String? tempIdLocal;
+  String? tempIdFirebase;
   DateTime? createdAt;
   DateTime? updatedAt;
-  bool? isSynced; // true if uploaded to Firestore
 
   ProfilingData({
     this.firstName,
@@ -85,9 +117,9 @@ class ProfilingData {
     this.isIndigenous,
     this.indigenousGroup,
     this.isPWD,
-    this.maritalStatus,
     this.spouseName,
-    this.primaryCommodity,
+    this.tribeEthnicity,
+        this.primaryCommodity,
     this.primaryCommodityOthers,
     this.secondaryCommodity,
     this.secondaryCommodityOthers,
@@ -98,6 +130,9 @@ class ProfilingData {
     this.landTenureshipOthers,
     this.secondaryCommodityRecurrence,
     this.secondaryCommodityOthersRecurrence,
+    this.secondaryCommodityRecurrenceOthers,
+    this.primaryCommodityRecurrence,
+    this.primaryCommodityRecurrenceOthers,
     this.yearCovered,
     this.receivedCommodity,
     this.receivedCommodityOthers,
@@ -109,6 +144,24 @@ class ProfilingData {
     this.primaryRemarks,
     this.secondaryAmount,
     this.secondaryRemarks,
+    this.primaryCommodityIncome,
+    this.primaryCommodityRemarks,
+    this.secondaryCommodityIncome,
+    this.secondaryCommodityRemarks,
+    this.riceIncomeField,
+    this.riceRemarks,
+    this.hvcIncomeField,
+    this.hvcRemarks,
+    this.livestockIncomeField,
+    this.livestockRemarks,
+    this.fishingIncomeField,
+    this.fishingRemarks,
+    this.nonFarmFisheriesIncomeField,
+    this.nonFarmFisheriesRemarks,
+    this.cooperativeName,
+    this.cooperativePosition,
+    this.dateOfMembership,
+    this.cooperativePositionOthers,
     this.idType,
     this.idFrontImagePath,
     this.idBackImagePath,
@@ -116,13 +169,28 @@ class ProfilingData {
     this.signatureImagePath,
     this.signatureImage,
     this.userId,
-    this.farmerFolderName,
+    this.status,
+    this.enumeratorEmail,
+    this.approverEmail,
+    this.approvedAt,
+        this.farmerFolderName,
+    this.tempIdLocal,
+    this.tempIdFirebase,
     this.createdAt,
     this.updatedAt,
-    this.isSynced = false,
   });
 
+  // Backwards-compatible getters used by older UI code
+  int? get numberOfMalesInFamily => maleFamilyMembers;
+  int? get numberOfFemalesInFamily => femaleFamilyMembers;
+  String? get primaryCommodityIncomeRemarks => primaryCommodityRemarks;
+  String? get secondaryCommodityIncomeRemarks => secondaryCommodityRemarks;
+
   /// Convert to Firestore-ready map (excluding image paths for now)
+  /// Convert ProfilingData to Firestore-safe format
+  /// NOTE: Image paths are EXCLUDED - images stay local only
+  /// - idFrontImagePath, idBackImagePath, farmerPhotoPath, signatureImagePath not included
+  /// - Only profiling form data (personal info, commodities, income, etc) syncs
   Map<String, dynamic> toFirestore() {
     return {
       'firstName': firstName,
@@ -139,8 +207,8 @@ class ProfilingData {
       'isIndigenous': isIndigenous,
       'indigenousGroup': indigenousGroup,
       'isPWD': isPWD,
-      'maritalStatus': maritalStatus,
       'spouseName': spouseName,
+      'tribeEthnicity': tribeEthnicity,
       'primaryCommodity': primaryCommodity,
       'primaryCommodityOthers': primaryCommodityOthers,
       'secondaryCommodity': secondaryCommodity,
@@ -152,27 +220,45 @@ class ProfilingData {
       'landTenureshipOthers': landTenureshipOthers,
       'secondaryCommodityRecurrence': secondaryCommodityRecurrence,
       'secondaryCommodityOthersRecurrence': secondaryCommodityOthersRecurrence,
+      'secondaryCommodityRecurrenceOthers': secondaryCommodityRecurrenceOthers,
+      'primaryCommodityRecurrence': primaryCommodityRecurrence,
+      'primaryCommodityRecurrenceOthers': primaryCommodityRecurrenceOthers,
       'yearCovered': yearCovered,
       'receivedCommodity': receivedCommodity,
       'receivedCommodityOthers': receivedCommodityOthers,
       'agriRelatedIncome': agriRelatedIncome,
       'saadNetIncome': saadNetIncome,
       'nonAgriRelatedIncome': nonAgriRelatedIncome,
-      'mainSourcesOfIncome': mainSourcesOfIncome,
+        'enumeratorEmail': enumeratorEmail,
+        'farmerFolderName': farmerFolderName,
       'primaryAmount': primaryAmount,
       'primaryRemarks': primaryRemarks,
       'secondaryAmount': secondaryAmount,
       'secondaryRemarks': secondaryRemarks,
+      // legacy primary/secondary fields removed in favor of specific commodity fields
+      'riceIncomeField': riceIncomeField,
+      'riceRemarks': riceRemarks,
+      'hvcIncomeField': hvcIncomeField,
+      'hvcRemarks': hvcRemarks,
+      'livestockIncomeField': livestockIncomeField,
+      'livestockRemarks': livestockRemarks,
+      'fishingIncomeField': fishingIncomeField,
+      'fishingRemarks': fishingRemarks,
+      'nonFarmFisheriesIncomeField': nonFarmFisheriesIncomeField,
+      'nonFarmFisheriesRemarks': nonFarmFisheriesRemarks,
+      'cooperativeName': cooperativeName,
+      'cooperativePosition': cooperativePosition,
+      'dateOfMembership': dateOfMembership,
+      'cooperativePositionOthers': cooperativePositionOthers,
       'idType': idType,
-      'idFrontImagePath': idFrontImagePath,
-      'idBackImagePath': idBackImagePath,
-      'farmerPhotoPath': farmerPhotoPath,
-      'signatureImagePath': signatureImagePath,
-      'farmerFolderName': farmerFolderName,
       'userId': userId,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
-      'isSynced': isSynced ?? false,
+      'status': status,
+      'approverEmail': approverEmail,
+      'approvedAt': approvedAt?.toIso8601String(),
+      'tempIdLocal': tempIdLocal,
+      'tempIdFirebase': tempIdFirebase,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 }

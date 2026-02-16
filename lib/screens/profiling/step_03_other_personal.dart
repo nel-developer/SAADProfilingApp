@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
+import 'package:da_project_1/models/profiling_data.dart';
 
 /// Step 3 of 8 — Other Personal Information
 /// Fields: Indigenous Group (Yes/No + Autocomplete), PWD (Yes/No), Spouse Name
@@ -10,12 +11,14 @@ class Step03OtherPersonal extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step03OtherPersonal({
     super.key,
     required this.onNext,
     required this.onBack,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -25,7 +28,52 @@ class Step03OtherPersonal extends StatefulWidget {
 class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
   bool? _isIndigenous;
   bool? _isPWD;
+  // ignore: unused_field
+  String? _selectedIndigenousGroup;
+  String? _selectedTribeEthnicity = 'Filipino';
   final TextEditingController _spouseNameCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners only once in initState to prevent duplicates
+    _spouseNameCtrl.addListener(_autoSaveToCurrentData);
+    _loadData();
+  }
+
+  @override
+  void didUpdateWidget(Step03OtherPersonal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step via back button
+    _loadData();
+  }
+
+  void _loadData() {
+    // Prefill from shared currentData if available
+    if (widget.currentData != null) {
+      _isIndigenous = widget.currentData!.isIndigenous;
+      _selectedIndigenousGroup = widget.currentData!.indigenousGroup;
+      _isPWD = widget.currentData!.isPWD;
+      _spouseNameCtrl.text = widget.currentData!.spouseName ?? '';
+      _selectedTribeEthnicity = widget.currentData!.tribeEthnicity ?? 'Filipino';
+    }
+  }
+
+  void _autoSaveToCurrentData() {
+    if (widget.currentData != null) {
+      widget.currentData!.isIndigenous = _isIndigenous;
+      widget.currentData!.indigenousGroup = _selectedIndigenousGroup;
+      widget.currentData!.isPWD = _isPWD;
+      widget.currentData!.spouseName = _spouseNameCtrl.text.trim();
+      widget.currentData!.tribeEthnicity = _selectedTribeEthnicity;
+    }
+  }
+
+  @override
+  void dispose() {
+    _spouseNameCtrl.dispose();
+    super.dispose();
+  }
 
   final List<String> _indigenousGroups = [
     'Abelling/Aberling',
@@ -252,10 +300,16 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
     'Yogad',
   ];
 
-  @override
-  void dispose() {
-    _spouseNameCtrl.dispose();
-    super.dispose();
+  void _handleNext() {
+    // Save data to shared currentData before proceeding
+    if (widget.currentData != null) {
+      widget.currentData!.isIndigenous = _isIndigenous;
+      widget.currentData!.indigenousGroup = _selectedIndigenousGroup;
+      widget.currentData!.isPWD = _isPWD;
+      widget.currentData!.spouseName = _spouseNameCtrl.text.trim();
+      widget.currentData!.tribeEthnicity = _selectedTribeEthnicity;
+    }
+    widget.onNext();
   }
 
   @override
@@ -274,7 +328,7 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
     return ProfilingStepWrapper(
       currentStep: 3,
       sectionTitle: 'Other Personal Information',
-      onNext: widget.onNext,
+      onNext: _handleNext,
       onBack: widget.onBack,
       onHeaderBack: widget.onHeaderBack,
       child: Column(
@@ -293,6 +347,7 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
                 onChanged: (value) {
                   setState(() {
                     _isIndigenous = value;
+                    _autoSaveToCurrentData();
                   });
                 },
                 radioSize: radioSize,
@@ -309,6 +364,7 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
                     if (value == false) {
                       _selectedIndigenousGroup = null;
                     }
+                    _autoSaveToCurrentData();
                   });
                 },
                 radioSize: radioSize,
@@ -358,6 +414,7 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
                 onChanged: (value) {
                   setState(() {
                     _isPWD = value;
+                    _autoSaveToCurrentData();
                   });
                 },
                 radioSize: radioSize,
@@ -371,6 +428,7 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
                 onChanged: (value) {
                   setState(() {
                     _isPWD = value;
+                    _autoSaveToCurrentData();
                   });
                 },
                 radioSize: radioSize,

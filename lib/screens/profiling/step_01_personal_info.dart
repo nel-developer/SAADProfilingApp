@@ -3,17 +3,20 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
+import 'package:da_project_1/models/profiling_data.dart';
 
 /// Step 1 of 8 — Personal Information
 /// Fields: First Name, Middle Name, Surname, Extension Name
 class Step01PersonalInfo extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step01PersonalInfo({
     super.key,
     required this.onNext,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -27,12 +30,63 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
   final TextEditingController _extensionCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadData();
+    // Add listeners only once in initState to prevent duplicates
+    _firstNameCtrl.addListener(_autoSaveToCurrentData);
+    _middleNameCtrl.addListener(_autoSaveToCurrentData);
+    _surnameCtrl.addListener(_autoSaveToCurrentData);
+    _extensionCtrl.addListener(_autoSaveToCurrentData);
+  }
+
+  void _loadData() {
+    // Prefill from shared currentData if available
+    if (widget.currentData != null) {
+      _firstNameCtrl.text = widget.currentData!.firstName ?? '';
+      _middleNameCtrl.text = widget.currentData!.middleName ?? '';
+      _surnameCtrl.text = widget.currentData!.surname ?? '';
+      _extensionCtrl.text = widget.currentData!.extensionName ?? '';
+    }
+  }
+
+  @override
+  void didUpdateWidget(Step01PersonalInfo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step or when currentData changes
+    _loadData();
+  }
+
+  void _autoSaveToCurrentData() {
+    if (widget.currentData != null) {
+      widget.currentData!.firstName = _firstNameCtrl.text.trim();
+      widget.currentData!.middleName = _middleNameCtrl.text.trim();
+      widget.currentData!.surname = _surnameCtrl.text.trim();
+      widget.currentData!.extensionName = _extensionCtrl.text.trim();
+    }
+  }
+
+  @override
   void dispose() {
     _firstNameCtrl.dispose();
     _middleNameCtrl.dispose();
     _surnameCtrl.dispose();
     _extensionCtrl.dispose();
     super.dispose();
+  }
+
+  void _handleNext() {
+    // Validate required fields (middle name & extension are exempt)
+    // Save without per-step validation (final validation happens on submit)
+
+    // Save data to shared currentData before proceeding
+    if (widget.currentData != null) {
+      widget.currentData!.firstName = _firstNameCtrl.text.trim();
+      widget.currentData!.middleName = _middleNameCtrl.text.trim();
+      widget.currentData!.surname = _surnameCtrl.text.trim();
+      widget.currentData!.extensionName = _extensionCtrl.text.trim();
+    }
+    widget.onNext();
   }
 
   @override
@@ -50,7 +104,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
     return ProfilingStepWrapper(
       currentStep: 1,
       sectionTitle: 'Personal Information',
-      onNext: widget.onNext,
+      onNext: _handleNext,
       onBack: null,
       onHeaderBack: widget.onHeaderBack,
       child: Column(

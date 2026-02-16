@@ -4,6 +4,8 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
+import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/image_storage_service.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -18,12 +20,14 @@ class Step08Signature extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback? onBack;
   final VoidCallback? onHeaderBack;
+  final ProfilingData? currentData;
 
   const Step08Signature({
     super.key,
     required this.onNext,
     this.onBack,
     this.onHeaderBack,
+    this.currentData,
   });
 
   @override
@@ -38,6 +42,7 @@ class _Step08SignatureState extends State<Step08Signature> {
   Uint8List? _signatureImage;
 
   final ImagePicker _picker = ImagePicker();
+  final ImageStorageService _imageStorage = ImageStorageService();
 
   final List<String> _idTypes = [
     'SSS ID',
@@ -50,6 +55,27 @@ class _Step08SignatureState extends State<Step08Signature> {
     'PWD ID',
     'Others',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  @override
+  void didUpdateWidget(Step08Signature oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data when returning to this step via back button
+    _loadData();
+  }
+
+  void _loadData() {
+    if (widget.currentData != null) {
+      _idType = widget.currentData!.idType;
+      // Note: Image files from paths would need special handling
+      // For now, we'll just restore the ID type
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +95,7 @@ class _Step08SignatureState extends State<Step08Signature> {
     return ProfilingStepWrapper(
       currentStep: 8,
       sectionTitle: 'Farmer\'s Signature',
-      onNext: widget.onNext,
+      onNext: () => _handleNext(),
       onBack: widget.onBack,
       onHeaderBack: widget.onHeaderBack,
       child: Column(
@@ -128,7 +154,7 @@ class _Step08SignatureState extends State<Step08Signature> {
             height: buttonHeight,
             textSize: buttonTextSize,
             iconSize: iconSize,
-            onTap: () => _showPrivacyModalThenSignature(context),
+            onTap: () => _showPrivacyModalThenSignature(),
             hasSigned: _signatureImage != null,
           ),
         ],
@@ -197,7 +223,101 @@ class _Step08SignatureState extends State<Step08Signature> {
     );
   }
 
-  void _showPrivacyModalThenSignature(BuildContext context) async {
+  void _handleNext() async {
+    // No step-level validation; all validation happens at final submit
+    if (widget.currentData == null) {
+      widget.onNext();
+      return;
+    }
+
+    widget.currentData!.idType = _idType;
+    
+    // Generate farmer folder name if not already set
+    if (widget.currentData!.farmerFolderName == null || widget.currentData!.farmerFolderName!.isEmpty) {
+      final firstName = widget.currentData!.firstName ?? 'farmer';
+      final surname = widget.currentData!.surname ?? 'profiling';
+      final uniqueId = widget.currentData!.tempIdLocal ?? DateTime.now().millisecondsSinceEpoch.toString();
+      widget.currentData!.farmerFolderName = 
+        _imageStorage.generateFarmerFolderName(firstName, surname, uniqueId: uniqueId);
+    }
+
+    final farmerFolder = widget.currentData!.farmerFolderName!;
+    final firstName = widget.currentData!.firstName;
+    final surname = widget.currentData!.surname;
+
+    // Save all images in parallel using batch isolate (non-blocking)
+    try {
+      debugPrint('📸 Saving all images (batch mode)...');
+      
+      // Prepare batch: only include images that exist
+      final imagesToSave = <String, File>{};
+      if (_idFrontImage != null) imagesToSave['front'] = _idFrontImage!;
+      if (_idBackImage != null) imagesToSave['back'] = _idBackImage!;
+      if (_farmerPhoto != null) imagesToSave['profile'] = _farmerPhoto!;
+
+      // Save all as batch in isolate (main thread stays responsive)
+      final savedPaths = await _imageStorage.saveImageBatch(
+        farmerFolderName: farmerFolder,
+        imagesToSave: imagesToSave,
+        signatureData: _signatureImage,
+        firstName: firstName,
+        lastName: surname,
+      );
+
+      // Map results back to model
+      if (savedPaths.containsKey('front')) {
+        widget.currentData!.idFrontImagePath = savedPaths['front'];
+        debugPrint('✅ ID Front saved: ${widget.currentData!.idFrontImagePath}');
+      }
+      if (savedPaths.containsKey('back')) {
+        widget.currentData!.idBackImagePath = savedPaths['back'];
+        debugPrint('✅ ID Back saved: ${widget.currentData!.idBackImagePath}');
+      }
+      if (savedPaths.containsKey('profile')) {
+        widget.currentData!.farmerPhotoPath = savedPaths['profile'];
+        debugPrint('✅ Farmer photo saved: ${widget.currentData!.farmerPhotoPath}');
+        
+        // Verify farmer photo
+        final farmerPhotoExists = await _imageStorage.imageExists(widget.currentData!.farmerPhotoPath);
+        if (!farmerPhotoExists) {
+          throw Exception('Farmer photo file verification failed at: ${widget.currentData!.farmerPhotoPath}\nPlease check device storage.');
+        }
+      }
+      if (savedPaths.containsKey('signature')) {
+        widget.currentData!.signatureImagePath = savedPaths['signature'];
+        debugPrint('✅ Signature saved: ${widget.currentData!.signatureImagePath}');
+      }
+
+      debugPrint('📁 All images saved to: $farmerFolder');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Images saved successfully!'),
+          backgroundColor: DAColors.primaryGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // Proceed to next step
+      widget.onNext();
+    } catch (e) {
+      debugPrint('❌ Error saving images: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving images: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showPrivacyModalThenSignature() async {
+    final context = this.context; // Capture context before async
+    
     // Show privacy policy modal
     final accepted = await showDialog<bool>(
       context: context,
@@ -213,9 +333,9 @@ class _Step08SignatureState extends State<Step08Signature> {
       builder: (_) => const _SignaturePadModal(),
     );
 
+    if (!mounted) return;
     if (signature != null) {
       setState(() => _signatureImage = signature);
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Signature saved'),
@@ -262,7 +382,7 @@ class _Step08SignatureState extends State<Step08Signature> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(
