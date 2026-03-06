@@ -6,7 +6,7 @@ import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 
 /// Step 3 of 8 — Other Personal Information
-/// Fields: Indigenous Group (Yes/No + Autocomplete), PWD (Yes/No), Spouse Name
+/// Fields: Indigenous Group (Yes/No + Autocomplete), PWD (Yes/No), Marital Status, Spouse Name (if married)
 class Step03OtherPersonal extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
@@ -28,6 +28,7 @@ class Step03OtherPersonal extends StatefulWidget {
 class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
   bool? _isIndigenous;
   bool? _isPWD;
+  String? _maritalStatus; // 'married', 'single', 'widowed'
   // ignore: unused_field
   String? _selectedIndigenousGroup;
   String? _selectedTribeEthnicity = 'Filipino';
@@ -37,8 +38,22 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
   void initState() {
     super.initState();
     // Add listeners only once in initState to prevent duplicates
-    _spouseNameCtrl.addListener(_autoSaveToCurrentData);
+    _spouseNameCtrl.addListener(_handleSpouseNameChange);
     _loadData();
+  }
+
+  void _forceUppercase(TextEditingController controller) {
+    final upper = controller.text.toUpperCase();
+    if (controller.text == upper) return;
+    controller.value = TextEditingValue(
+      text: upper,
+      selection: TextSelection.collapsed(offset: upper.length),
+    );
+  }
+
+  void _handleSpouseNameChange() {
+    _forceUppercase(_spouseNameCtrl);
+    _autoSaveToCurrentData();
   }
 
   @override
@@ -54,8 +69,11 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
       _isIndigenous = widget.currentData!.isIndigenous;
       _selectedIndigenousGroup = widget.currentData!.indigenousGroup;
       _isPWD = widget.currentData!.isPWD;
+      _maritalStatus = widget.currentData!.maritalStatus;
       _spouseNameCtrl.text = widget.currentData!.spouseName ?? '';
-      _selectedTribeEthnicity = widget.currentData!.tribeEthnicity ?? 'Filipino';
+      _forceUppercase(_spouseNameCtrl);
+      _selectedTribeEthnicity =
+          widget.currentData!.tribeEthnicity ?? 'Filipino';
     }
   }
 
@@ -64,7 +82,10 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
       widget.currentData!.isIndigenous = _isIndigenous;
       widget.currentData!.indigenousGroup = _selectedIndigenousGroup;
       widget.currentData!.isPWD = _isPWD;
-      widget.currentData!.spouseName = _spouseNameCtrl.text.trim();
+      widget.currentData!.maritalStatus = _maritalStatus;
+      widget.currentData!.spouseName = _spouseNameCtrl.text
+          .trim()
+          .toUpperCase();
       widget.currentData!.tribeEthnicity = _selectedTribeEthnicity;
     }
   }
@@ -306,10 +327,22 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
       widget.currentData!.isIndigenous = _isIndigenous;
       widget.currentData!.indigenousGroup = _selectedIndigenousGroup;
       widget.currentData!.isPWD = _isPWD;
-      widget.currentData!.spouseName = _spouseNameCtrl.text.trim();
+      widget.currentData!.maritalStatus = _maritalStatus;
+      widget.currentData!.spouseName = _spouseNameCtrl.text
+          .trim()
+          .toUpperCase();
       widget.currentData!.tribeEthnicity = _selectedTribeEthnicity;
     }
     widget.onNext();
+  }
+
+  void _handleHeaderBack() {
+    _autoSaveToCurrentData();
+    if (widget.onHeaderBack != null) {
+      widget.onHeaderBack!();
+    } else {
+      widget.onBack();
+    }
   }
 
   @override
@@ -318,19 +351,39 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
     final isTablet = width > 600;
     final isLargeTablet = width > 900;
 
-    final double labelSize = isLargeTablet ? 16.0 : isTablet ? 15.0 : 14.0;
-    final double fieldGap = isLargeTablet ? 22.0 : isTablet ? 18.0 : 14.0;
+    final double labelSize = isLargeTablet
+        ? 16.0
+        : isTablet
+        ? 15.0
+        : 14.0;
+    final double fieldGap = isLargeTablet
+        ? 22.0
+        : isTablet
+        ? 18.0
+        : 14.0;
     final double labelFieldGap = isLargeTablet ? 8.0 : 6.0;
-    final double fieldHeight = isLargeTablet ? 54.0 : isTablet ? 50.0 : 44.0;
-    final double radioSize = isLargeTablet ? 28.0 : isTablet ? 26.0 : 24.0;
-    final double radioTextSize = isLargeTablet ? 17.0 : isTablet ? 16.0 : 15.0;
+    final double fieldHeight = isLargeTablet
+        ? 54.0
+        : isTablet
+        ? 50.0
+        : 44.0;
+    final double radioSize = isLargeTablet
+        ? 28.0
+        : isTablet
+        ? 26.0
+        : 24.0;
+    final double radioTextSize = isLargeTablet
+        ? 17.0
+        : isTablet
+        ? 16.0
+        : 15.0;
 
     return ProfilingStepWrapper(
       currentStep: 3,
       sectionTitle: 'Other Personal Information',
       onNext: _handleNext,
       onBack: widget.onBack,
-      onHeaderBack: widget.onHeaderBack,
+      onHeaderBack: _handleHeaderBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -439,31 +492,100 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
 
           SizedBox(height: fieldGap),
 
-          // NAME OF THE SPOUSE
-          Row(
+          // MARITAL STATUS
+          _label('Marital Status', labelSize),
+          SizedBox(height: labelFieldGap),
+
+          Wrap(
+            spacing: width * 0.04,
+            runSpacing: 8,
             children: [
-              _label('Name of the Spouse ', labelSize),
-              Flexible(
-                child: Text(
-                  '(if married)(LN, FN, MI)',
-                  style: GoogleFonts.poppins(
-                    fontSize: labelSize - 2,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.grey.shade600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              _radioOption(
+                label: 'Single',
+                value: 'single',
+                groupValue: _maritalStatus,
+                onChanged: (value) {
+                  setState(() {
+                    _maritalStatus = value;
+                    // Clear spouse name if not married
+                    if (value != 'married') {
+                      _spouseNameCtrl.clear();
+                    }
+                    _autoSaveToCurrentData();
+                  });
+                },
+                radioSize: radioSize,
+                textSize: radioTextSize,
+              ),
+              _radioOption(
+                label: 'Married',
+                value: 'married',
+                groupValue: _maritalStatus,
+                onChanged: (value) {
+                  setState(() {
+                    _maritalStatus = value;
+                    _autoSaveToCurrentData();
+                  });
+                },
+                radioSize: radioSize,
+                textSize: radioTextSize,
+              ),
+              _radioOption(
+                label: 'Widowed',
+                value: 'widowed',
+                groupValue: _maritalStatus,
+                onChanged: (value) {
+                  setState(() {
+                    _maritalStatus = value;
+                    // Clear spouse name if not married
+                    if (value != 'married') {
+                      _spouseNameCtrl.clear();
+                    }
+                    _autoSaveToCurrentData();
+                  });
+                },
+                radioSize: radioSize,
+                textSize: radioTextSize,
               ),
             ],
           ),
-          SizedBox(height: labelFieldGap),
-          SizedBox(
-            height: fieldHeight,
-            child: _shadowedField(
-              controller: _spouseNameCtrl,
-              hint: 'Enter Spouse Name',
+
+          SizedBox(height: fieldGap),
+
+          // NAME OF THE SPOUSE — Only show if married
+          if (_maritalStatus == 'married')
+            Padding(
+              padding: EdgeInsets.only(bottom: fieldGap),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _label('Name of the Spouse ', labelSize),
+                      Flexible(
+                        child: Text(
+                          '(LN, FN, MI)',
+                          style: GoogleFonts.poppins(
+                            fontSize: labelSize - 2,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.grey.shade600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: labelFieldGap),
+                  SizedBox(
+                    height: fieldHeight,
+                    child: _shadowedField(
+                      controller: _spouseNameCtrl,
+                      hint: 'Enter Spouse Name',
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -480,11 +602,11 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
     );
   }
 
-  Widget _radioOption({
+  Widget _radioOption<T>({
     required String label,
-    required bool value,
-    required bool? groupValue,
-    required ValueChanged<bool?> onChanged,
+    required T value,
+    required T? groupValue,
+    required ValueChanged<T?> onChanged,
     required double radioSize,
     required double textSize,
   }) {
@@ -510,7 +632,9 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
                 shape: BoxShape.circle,
                 color: isSelected ? DAColors.primaryGreen : Colors.white,
                 border: Border.all(
-                  color: isSelected ? DAColors.primaryGreen : Colors.grey.shade400,
+                  color: isSelected
+                      ? DAColors.primaryGreen
+                      : Colors.grey.shade400,
                   width: 2.5,
                 ),
                 boxShadow: [
@@ -567,10 +691,7 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
           ),
         ],
       ),
-      child: CustomTextField(
-        controller: controller,
-        hintText: hint,
-      ),
+      child: CustomTextField(controller: controller, hintText: hint),
     );
   }
 
@@ -602,9 +723,9 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
             return const Iterable<String>.empty();
           }
           return options.where((String option) {
-            return option
-                .toLowerCase()
-                .contains(textEditingValue.text.toLowerCase());
+            return option.toLowerCase().contains(
+              textEditingValue.text.toLowerCase(),
+            );
           });
         },
         onSelected: onSelected,
@@ -627,7 +748,10 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
               ),
               filled: true,
               fillColor: DAColors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,

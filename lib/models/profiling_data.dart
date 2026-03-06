@@ -17,22 +17,34 @@ class ProfilingData {
   String? sitioPurok;
   String? dateOfBirth;
   String? sex;
+  String? rsbsaFishrIdNo;
+  String? saadIdNo;
+  bool? isExistingFarmer;
+  String? selectedExistingSaadId;
 
   // Step 3: Other Personal Information
   bool? isIndigenous;
   String? indigenousGroup;
   bool? isPWD;
+  String? maritalStatus; // 'married', 'single', 'widowed'
   String? spouseName;
   String? tribeEthnicity;
-  
-  
-  // Step 4: Main Commodity
+
+  // Step 4: SAAD Commodity Type
+  String? saadCommodityType;
+  List<Map<String, dynamic>>? saadCommodities;
+
+  // Step 5: Non-SAAD Commodity Type
+  String? nonSAADCommodityType;
+  List<Map<String, dynamic>>? nonSAADCommodities;
+
+  // Step 6: Main Commodity
   String? primaryCommodity;
   String? primaryCommodityOthers;
   String? secondaryCommodity;
   String? secondaryCommodityOthers;
 
-  // Step 5: Recurrence
+  // Step 7: Recurrence
   int? maleFamilyMembers;
   int? femaleFamilyMembers;
   int? yearsInFarming;
@@ -45,16 +57,25 @@ class ProfilingData {
   bool? primaryCommodityRecurrence;
   String? primaryCommodityRecurrenceOthers;
   int? yearCovered;
+  Map<String, dynamic>? recurrenceByYear;
   String? receivedCommodity;
   String? receivedCommodityOthers;
+  // Received commodity expanded: primary + secondary types
+  String? receivedPrimaryCommodity;
+  String? receivedSecondaryCommodity;
+  // Received commodity financials
+  double? receivedTotalPrice;
+  double? receivedExpenses;
+  String? receivedRemarks;
 
-  // Step 6: Monthly Family Income
+  // Step 8: Monthly Family Income
   double? agriRelatedIncome;
   double? saadNetIncome;
+  double? nonSAADNetIncome;
   double? nonAgriRelatedIncome;
   String? mainSourcesOfIncome;
 
-  // Step 7: Farm/Fisheries Income
+  // Step 9: Farm/Fisheries Income
   String? primaryAmount;
   String? primaryRemarks;
   String? secondaryAmount;
@@ -63,7 +84,7 @@ class ProfilingData {
   String? primaryCommodityRemarks;
   String? secondaryCommodityIncome;
   String? secondaryCommodityRemarks;
-  
+
   // Specific commodities income and remarks
   String? riceIncomeField;
   String? riceRemarks;
@@ -76,13 +97,15 @@ class ProfilingData {
   String? nonFarmFisheriesIncomeField;
   String? nonFarmFisheriesRemarks;
 
-  // Farmers/Fishers Cooperative
-  String? cooperativeName;
-  String? cooperativePosition;
-  String? dateOfMembership;
-  String? cooperativePositionOthers;
+  // Non-Farm/Fisheries Income (3 beneficiary types)
+  String? beneficiaryNonFarmIncome;
+  String? beneficiaryRemarks; // added for multiline notes
+  String? spouseNonFarmIncome;
+  String? spouseRemarks;
+  String? otherMembersNonFarmIncome;
+  String? otherMembersRemarks; // added for multiline notes
 
-  // Step 8: Signature
+  // Step 10: Signature & Images
   String? idType;
   String? idFrontImagePath;
   String? idBackImagePath;
@@ -90,17 +113,25 @@ class ProfilingData {
   String? signatureImagePath;
   Uint8List? signatureImage;
 
-  // Meta
+  // System fields
+  String? farmerFolderName; // Unique folder identifier for organizing images
+  String? tempIdLocal;
+  String? tempIdFirebase;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+
+  // Cooperative fields
+  String? cooperativeName;
+  String? cooperativePosition;
+  String? dateOfMembership;
+  String? cooperativePositionOthers;
+
+  // User & Status fields
   String? userId;
   String? status;
   String? enumeratorEmail;
   String? approverEmail;
   DateTime? approvedAt;
-    String? farmerFolderName; // Unique folder identifier for organizing images
-  String? tempIdLocal;
-  String? tempIdFirebase;
-  DateTime? createdAt;
-  DateTime? updatedAt;
 
   ProfilingData({
     this.firstName,
@@ -114,12 +145,21 @@ class ProfilingData {
     this.sitioPurok,
     this.dateOfBirth,
     this.sex,
+    this.rsbsaFishrIdNo,
+    this.saadIdNo,
+    this.isExistingFarmer,
+    this.selectedExistingSaadId,
     this.isIndigenous,
     this.indigenousGroup,
     this.isPWD,
+    this.maritalStatus,
     this.spouseName,
     this.tribeEthnicity,
-        this.primaryCommodity,
+    this.saadCommodityType,
+    this.saadCommodities,
+    this.nonSAADCommodityType,
+    this.nonSAADCommodities,
+    this.primaryCommodity,
     this.primaryCommodityOthers,
     this.secondaryCommodity,
     this.secondaryCommodityOthers,
@@ -134,10 +174,17 @@ class ProfilingData {
     this.primaryCommodityRecurrence,
     this.primaryCommodityRecurrenceOthers,
     this.yearCovered,
+    this.recurrenceByYear,
     this.receivedCommodity,
     this.receivedCommodityOthers,
+    this.receivedPrimaryCommodity,
+    this.receivedSecondaryCommodity,
+    this.receivedTotalPrice,
+    this.receivedExpenses,
+    this.receivedRemarks,
     this.agriRelatedIncome,
     this.saadNetIncome,
+    this.nonSAADNetIncome,
     this.nonAgriRelatedIncome,
     this.mainSourcesOfIncome,
     this.primaryAmount,
@@ -158,6 +205,12 @@ class ProfilingData {
     this.fishingRemarks,
     this.nonFarmFisheriesIncomeField,
     this.nonFarmFisheriesRemarks,
+    this.beneficiaryNonFarmIncome,
+    this.beneficiaryRemarks,
+    this.spouseNonFarmIncome,
+    this.spouseRemarks,
+    this.otherMembersNonFarmIncome,
+    this.otherMembersRemarks,
     this.cooperativeName,
     this.cooperativePosition,
     this.dateOfMembership,
@@ -173,7 +226,7 @@ class ProfilingData {
     this.enumeratorEmail,
     this.approverEmail,
     this.approvedAt,
-        this.farmerFolderName,
+    this.farmerFolderName,
     this.tempIdLocal,
     this.tempIdFirebase,
     this.createdAt,
@@ -204,11 +257,20 @@ class ProfilingData {
       'sitioPurok': sitioPurok,
       'dateOfBirth': dateOfBirth,
       'sex': sex,
+      'rsbsaFishrIdNo': rsbsaFishrIdNo,
+      'saadIdNo': saadIdNo,
+      'isExistingFarmer': isExistingFarmer,
+      'selectedExistingSaadId': selectedExistingSaadId,
       'isIndigenous': isIndigenous,
       'indigenousGroup': indigenousGroup,
       'isPWD': isPWD,
+      'maritalStatus': maritalStatus,
       'spouseName': spouseName,
       'tribeEthnicity': tribeEthnicity,
+      'saadCommodityType': saadCommodityType,
+      'saadCommodities': saadCommodities,
+      'nonSAADCommodityType': nonSAADCommodityType,
+      'nonSAADCommodities': nonSAADCommodities,
       'primaryCommodity': primaryCommodity,
       'primaryCommodityOthers': primaryCommodityOthers,
       'secondaryCommodity': secondaryCommodity,
@@ -224,13 +286,20 @@ class ProfilingData {
       'primaryCommodityRecurrence': primaryCommodityRecurrence,
       'primaryCommodityRecurrenceOthers': primaryCommodityRecurrenceOthers,
       'yearCovered': yearCovered,
-      'receivedCommodity': receivedCommodity,
+      'recurrenceByYear': recurrenceByYear,
+      'receivedCommodity': receivedCommodity ?? receivedPrimaryCommodity,
       'receivedCommodityOthers': receivedCommodityOthers,
+      'receivedPrimaryCommodity': receivedPrimaryCommodity,
+      'receivedSecondaryCommodity': receivedSecondaryCommodity,
+      'receivedTotalPrice': receivedTotalPrice,
+      'receivedExpenses': receivedExpenses,
+      'receivedRemarks': receivedRemarks,
       'agriRelatedIncome': agriRelatedIncome,
       'saadNetIncome': saadNetIncome,
+      'nonSAADNetIncome': nonSAADNetIncome,
       'nonAgriRelatedIncome': nonAgriRelatedIncome,
-        'enumeratorEmail': enumeratorEmail,
-        'farmerFolderName': farmerFolderName,
+      'enumeratorEmail': enumeratorEmail,
+      'farmerFolderName': farmerFolderName,
       'primaryAmount': primaryAmount,
       'primaryRemarks': primaryRemarks,
       'secondaryAmount': secondaryAmount,
@@ -244,8 +313,14 @@ class ProfilingData {
       'livestockRemarks': livestockRemarks,
       'fishingIncomeField': fishingIncomeField,
       'fishingRemarks': fishingRemarks,
+      'spouseRemarks': spouseRemarks,
       'nonFarmFisheriesIncomeField': nonFarmFisheriesIncomeField,
       'nonFarmFisheriesRemarks': nonFarmFisheriesRemarks,
+      'beneficiaryNonFarmIncome': beneficiaryNonFarmIncome,
+      'beneficiaryRemarks': beneficiaryRemarks,
+      'spouseNonFarmIncome': spouseNonFarmIncome,
+      'otherMembersNonFarmIncome': otherMembersNonFarmIncome,
+      'otherMembersRemarks': otherMembersRemarks,
       'cooperativeName': cooperativeName,
       'cooperativePosition': cooperativePosition,
       'dateOfMembership': dateOfMembership,

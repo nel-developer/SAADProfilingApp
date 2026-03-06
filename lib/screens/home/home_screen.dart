@@ -4,6 +4,7 @@ import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/widgets/home_tile.dart';
 import 'package:da_project_1/widgets/green_header_section.dart';
 import 'package:da_project_1/services/firebase_auth_service.dart';
+import 'package:da_project_1/services/offline_auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _leafRightAnim;
 
   final FirebaseAuthService _authService = FirebaseAuthService();
+  final OfflineAuthService _offlineAuthService = OfflineAuthService();
   String? _userRole;
   String? _firstName;
 
@@ -98,8 +100,16 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _loadUserRole() async {
+    await _offlineAuthService.initialize();
     final user = _authService.currentUser;
     if (user != null) {
+      final cachedFirst = await _authService.getCachedFirstName(user.uid);
+      if (mounted && cachedFirst != null && cachedFirst.isNotEmpty) {
+        setState(() {
+          _firstName = cachedFirst;
+        });
+      }
+
       // Use `getUserRole` which checks in-memory and SharedPreferences caches
       // before querying Firestore. This is faster and avoids fetching full
       // user documents just to read the role.
@@ -108,9 +118,26 @@ class _HomeScreenState extends State<HomeScreen>
       final fetchedFirst = userData?['firstName'] as String?;
       setState(() {
         _userRole = role;
-        _firstName = (fetchedFirst != null && fetchedFirst.isNotEmpty) ? fetchedFirst : null;
+        _firstName = (fetchedFirst != null && fetchedFirst.isNotEmpty)
+            ? fetchedFirst
+            : null;
       });
+      return;
     }
+
+    // Offline mode fallback when FirebaseAuth user is not available.
+    final offlineUid = await _offlineAuthService.getStoredUid();
+    final offlineRole = await _offlineAuthService.getStoredRole();
+    String? cachedFirst;
+    if (offlineUid != null && offlineUid.isNotEmpty) {
+      cachedFirst = await _authService.getCachedFirstName(offlineUid);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _userRole = offlineRole;
+      _firstName = cachedFirst;
+    });
   }
 
   void _showLockedAlert() {
@@ -142,18 +169,18 @@ class _HomeScreenState extends State<HomeScreen>
     final height = size.height;
 
     // ── HEADER ──────────────────────────────────────────
-    final headerHeight  = (height * 0.22).clamp(120.0, 180.0);
-    final welcomeFont   = (width * 0.055).clamp(16.0, 28.0);
-    final avatarRadius  = (width * 0.07).clamp(20.0, 38.0);
-    final headerPadH    = (width * 0.06).clamp(16.0, 36.0);
-    final headerPadV    = (height * 0.02).clamp(10.0, 24.0);
+    final headerHeight = (height * 0.22).clamp(120.0, 180.0);
+    final welcomeFont = (width * 0.055).clamp(16.0, 28.0);
+    final avatarRadius = (width * 0.07).clamp(20.0, 38.0);
+    final headerPadH = (width * 0.06).clamp(16.0, 36.0);
+    final headerPadV = (height * 0.02).clamp(10.0, 24.0);
 
     // ── TILES ───────────────────────────────────────────
     // Tile size = ~38% of screen width, hard capped 100–150
     // This keeps tiles the same visual weight on 360 phones AND 540+ screens
     final tileSize = (width * 0.38).clamp(100.0, 150.0);
-    final gap      = (width * 0.035).clamp(10.0, 18.0);
-    final gridPad  = (width * 0.05).clamp(14.0, 28.0);
+    final gap = (width * 0.035).clamp(10.0, 18.0);
+    final gridPad = (width * 0.05).clamp(14.0, 28.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFE8E8E8),
@@ -275,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen>
                             route: AppRoutes.profiling,
                             animation: _tile2Anim,
                             isEnabled: true, // Everyone can profile
-                              onDisabledTap: _showLockedAlert,
+                            onDisabledTap: _showLockedAlert,
                           ),
                         ),
                       ],
@@ -294,9 +321,12 @@ class _HomeScreenState extends State<HomeScreen>
                             icon: Icons.people_outline,
                             route: AppRoutes.accounts,
                             animation: _tile3Anim,
-                            isEnabled: _userRole != null &&
-                                ['admin', 'moderator']
-                                  .contains(_userRole!.toLowerCase()),
+                            isEnabled:
+                                _userRole != null &&
+                                [
+                                  'admin',
+                                  'moderator',
+                                ].contains(_userRole!.toLowerCase()),
                             onDisabledTap: _showLockedAlert,
                           ),
                         ),

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// CommodityData — Represents a single commodity entry from the spreadsheet
 /// Used for dynamic dropdown/selection in profiling forms
 class CommodityData {
@@ -57,6 +59,17 @@ class CommodityData {
 
   /// Convert Firestore JSON to CommodityData
   factory CommodityData.fromFirestore(Map<String, dynamic> json, String docId) {
+    DateTime? parseTimestamp(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) {
+        return value.toDate();
+      }
+      if (value is String) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
     return CommodityData(
       id: docId,
       type: json['type'],
@@ -71,8 +84,8 @@ class CommodityData {
       totalPriceRequired: json['totalPriceRequired'] ?? false,
       expensesRequired: json['expensesRequired'] ?? false,
       remarks: json['remarks'],
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
-      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']) : null,
+      createdAt: parseTimestamp(json['createdAt']),
+      updatedAt: parseTimestamp(json['updatedAt']),
     );
   }
 

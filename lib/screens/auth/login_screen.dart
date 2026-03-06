@@ -5,7 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/services/firebase_auth_service.dart';
+import 'package:da_project_1/services/offline_auth_service.dart';
+import 'package:da_project_1/services/commodity_service.dart';
 import 'dart:math';
+import 'dart:async';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen>
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuthService _authService = FirebaseAuthService();
+  final OfflineAuthService _offlineAuthService = OfflineAuthService();
 
   late AnimationController _controller;
   late Animation<double> _logoScaleAnim;
@@ -37,6 +41,9 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+
+    // Initialize offline auth service
+    _offlineAuthService.initialize();
 
     _controller = AnimationController(
       vsync: this,
@@ -127,66 +134,117 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
 
     try {
-      final userCredential = await _authService.loginWithEmailPassword(
+      // Try Firebase login with timeout (5 seconds max)
+      UserCredential? userCredential;
+      try {
+        userCredential = await _authService
+            .loginWithEmailPassword(email: email, password: password)
+            .timeout(const Duration(seconds: 5));
+      } on TimeoutException {
+        userCredential = null; // Timeout — fall through to offline
+      }
+
+      if (userCredential?.user != null) {
+        // Firebase login successful
+        final uid = userCredential!.user!.uid;
+
+        // Cache minimal user data (non-blocking)
+        final cached = await _authService.getCachedUserData(uid);
+        String? accountStatus = cached?['accountStatus'] as String?;
+        String? role = cached?['role'] as String?;
+
+        if (accountStatus == null) {
+          // Try to fetch fresh data with short timeout
+          try {
+            final userData = await _authService
+                .getUserData(uid)
+                .timeout(const Duration(seconds: 3));
+            accountStatus = userData?['accountStatus'];
+            role = userData?['role'];
+          } catch (_) {
+            // Timeout or fetch failure — do NOT assume 'pending_review'.
+            // Prefer cached values; if unknown, allow login to proceed
+            // and rely on server-driven enforcement where necessary.
+            role ??= 'user';
+          }
+        }
+
+        // Save credentials for offline use (async, non-blocking)
+        await _offlineAuthService.saveCredentials(
+          email: email,
+          password: password,
+          uid: uid,
+          accountStatus: accountStatus ?? 'pending_review',
+          role: role ?? 'user',
+        );
+
+        // Bootstrap commodity cache from Firestore if empty (on first login)
+        debugPrint('📦 Starting commodity cache bootstrap...');
+        unawaited(
+          CommodityService()
+              .bootstrapCacheIfEmpty()
+              .timeout(const Duration(seconds: 10))
+              .catchError((e) {
+            debugPrint('⚠️ Bootstrap failed (non-blocking): $e');
+            // Continue anyway — cache may already be populated
+            return false;
+          }),
+        );
+
+        if (!mounted) return;
+
+        // Route based on status
+        if (accountStatus == 'pending_review') {
+          Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
+        } else if (accountStatus == 'rejected') {
+          await _authService.signOut();
+          _showErrorDialog(
+              'Your account has been rejected. Please contact support.');
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
+        return;
+      }
+
+      // Firebase failed — try offline login
+      final isValid = await _offlineAuthService.verifyStoredCredentials(
         email: email,
         password: password,
       );
 
-      if (userCredential?.user != null) {
-        // Fast path: try cached minimal user data first to avoid blocking login
-        final uid = userCredential!.user!.uid;
-        final cached = await _authService.getCachedUserData(uid);
+      if (!isValid) {
+        _showErrorDialog(
+            'Login failed. Please try again or connect to internet.');
+        return;
+      }
 
-        if (!mounted) return;
+      // Offline login successful
+      if (!mounted) return;
+      _showOfflineModeDialog();
 
-        String? accountStatus = cached?['accountStatus'] as String?;
+      final accountStatus = await _offlineAuthService.getStoredAccountStatus();
+      if (!mounted) return;
 
-        if (accountStatus != null) {
-          // We have cached status — route immediately
-          if (accountStatus == 'pending_review') {
-            Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
-          } else if (accountStatus == 'rejected') {
-            await _authService.signOut();
-            if (!mounted) return;
-            _showErrorDialog('Your account has been rejected. Please contact support.');
-          } else {
+      if (accountStatus == 'pending_review') {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+                context, AppRoutes.accountUnderReview);
+          }
+        });
+      } else if (accountStatus == 'rejected') {
+        _showErrorDialog(
+            'Your account has been rejected. Please contact support.');
+      } else {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
             Navigator.pushReplacementNamed(context, AppRoutes.home);
           }
-
-          // Refresh userData in background to update cache
-          // ignore: unawaited_futures
-          _authService.getUserData(uid);
-        } else {
-          // No cached data — fetch but don't block the UI for long.
-          // Use a short timeout so slow Firestore doesn't delay navigation.
-          final userData = await _authService
-              .getUserData(uid)
-              .timeout(const Duration(milliseconds: 800), onTimeout: () => null);
-          if (!mounted) return;
-          accountStatus = userData?['accountStatus'];
-
-          if (accountStatus == 'pending_review') {
-            Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
-          } else if (accountStatus == 'rejected') {
-            await _authService.signOut();
-            if (!mounted) return;
-            _showErrorDialog('Your account has been rejected. Please contact support.');
-          } else {
-            Navigator.pushReplacementNamed(context, AppRoutes.home);
-          }
-        }
+        });
       }
     } catch (e) {
       if (mounted) {
-        String message;
-        if (e is FirebaseAuthException) {
-          message = e.message ?? 'Login failed. Please try again.';
-        } else if (e is Exception) {
-          message = e.toString();
-        } else {
-          message = 'An unknown error occurred.';
-        }
-
+        String message = 'Login failed: ${e.toString()}';
         _showErrorDialog(message);
       }
     } finally {
@@ -202,6 +260,23 @@ class _LoginScreenState extends State<LoginScreen>
       builder: (context) => AlertDialog(
         title: const Text('Login Error'),
         content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOfflineModeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Offline Mode'),
+        content: const Text(
+            'You are logged in offline. Your profiling data will be saved locally and synced when you reconnect to the internet.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:da_project_1/services/offline_auth_service.dart';
 import 'dart:math';
 
 class SplashScreen extends StatefulWidget {
@@ -21,15 +22,38 @@ class _SplashScreenState extends State<SplashScreen> {
 
     Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
-
-      // If a Firebase user is cached locally, stay logged in and route to home.
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
-      } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
-      }
+      _handleNavigation();
     });
+  }
+
+  Future<void> _handleNavigation() async {
+    // Check if Firebase user is logged in (online session)
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      // Online session exists
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      }
+      return;
+    }
+
+    // No Firebase user. Check for offline session
+    final offlineAuthService = OfflineAuthService();
+    await offlineAuthService.initialize();
+
+    final hasOfflineSession = await offlineAuthService.hasValidOfflineSession();
+    if (hasOfflineSession) {
+      // Offline session exists — allow user to continue offline
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      }
+      return;
+    }
+
+    // No session (online or offline) — send to login
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
   }
 
   double _scale(BuildContext context) {

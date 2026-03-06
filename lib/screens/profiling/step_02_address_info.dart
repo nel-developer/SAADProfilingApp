@@ -43,7 +43,7 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
   List<String> _provinces = [];
   List<String> _municipalities = [];
   List<String> _barangays = [];
-  
+
   bool _locationsLoaded = false;
 
   @override
@@ -64,7 +64,9 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     super.didChangeDependencies();
     // Populate dependent dropdowns if region was already selected
     // (happens after initState or when returning to this step)
-    if (_regionCtrl.text.isNotEmpty && _regions.isNotEmpty && _provinces.isEmpty) {
+    if (_regionCtrl.text.isNotEmpty &&
+        _regions.isNotEmpty &&
+        _provinces.isEmpty) {
       _populateDropdownsForCurrentData();
     }
   }
@@ -72,8 +74,31 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
   @override
   void didUpdateWidget(Step02AddressInfo oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload data when returning to this step via back button
-    _loadDataAndPopulateDropdowns();
+    // Keep local in-memory state authoritative while this step widget is alive.
+    // Avoid reloads on parent rebuilds to prevent accidental field resets.
+  }
+
+  String _normalizeToken(String text) {
+    return text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  String? _findRegionByAlias(String alias) {
+    if (_regions.isEmpty) return null;
+    final target = _normalizeToken(alias);
+    for (final region in _regions) {
+      if (_normalizeToken(region) == target) {
+        return region;
+      }
+    }
+    if (target.contains('iva') || target.contains('4a')) {
+      for (final region in _regions) {
+        final token = _normalizeToken(region);
+        if (token.contains('iva') || token.contains('4a')) {
+          return region;
+        }
+      }
+    }
+    return null;
   }
 
   void _loadDataAndPopulateDropdowns() {
@@ -87,9 +112,23 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
       _dateOfBirthCtrl.text = widget.currentData!.dateOfBirth ?? '';
       _selectedSex = widget.currentData!.sex;
     }
-    
-    // If regions are loaded, populate the dropdowns
+
     if (_regions.isNotEmpty) {
+      // Align whatever is in controller/currentData to the exact region key
+      // from loaded location data, so dependent province lookup always works.
+      final currentRegionText = _regionCtrl.text.trim();
+      final resolvedRegion = currentRegionText.isEmpty
+          ? (_findRegionByAlias('Region IV-A') ??
+                (_regions.contains('Region IV-A') ? 'Region IV-A' : null))
+          : (_findRegionByAlias(currentRegionText) ?? currentRegionText);
+
+      if (resolvedRegion != null && resolvedRegion != _regionCtrl.text) {
+        _regionCtrl.text = resolvedRegion;
+      }
+      if (widget.currentData != null) {
+        widget.currentData!.region = _regionCtrl.text.trim();
+      }
+
       _populateDropdownsForCurrentData();
     }
   }
@@ -108,17 +147,32 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
 
   void _populateDropdownsForCurrentData() {
     if (_regionCtrl.text.isEmpty) return;
-    
+
+    final resolvedRegion =
+        _findRegionByAlias(_regionCtrl.text) ?? _regionCtrl.text;
+    if (resolvedRegion != _regionCtrl.text) {
+      _regionCtrl.text = resolvedRegion;
+    }
+
     // Get provinces for the selected region
-    _provinces = _locationService.getProvinces(_regionCtrl.text);
+    _provinces = _locationService.getProvinces(resolvedRegion);
 
-    if (_provinceCtrl.text.isNotEmpty && _provinces.contains(_provinceCtrl.text)) {
+    if (_provinceCtrl.text.isNotEmpty &&
+        _provinces.contains(_provinceCtrl.text)) {
       // Get municipalities for the selected province
-      _municipalities = _locationService.getMunicipalities(_regionCtrl.text, _provinceCtrl.text);
+      _municipalities = _locationService.getMunicipalities(
+        resolvedRegion,
+        _provinceCtrl.text,
+      );
 
-      if (_municipalityCtrl.text.isNotEmpty && _municipalities.contains(_municipalityCtrl.text)) {
+      if (_municipalityCtrl.text.isNotEmpty &&
+          _municipalities.contains(_municipalityCtrl.text)) {
         // Get barangays for the selected municipality
-        _barangays = _locationService.getBarangays(_regionCtrl.text, _provinceCtrl.text, _municipalityCtrl.text);
+        _barangays = _locationService.getBarangays(
+          resolvedRegion,
+          _provinceCtrl.text,
+          _municipalityCtrl.text,
+        );
       }
     }
   }
@@ -128,6 +182,21 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
       await _locationService.loadLocations();
       setState(() {
         _regions = _locationService.getRegions();
+
+        // Set Region IV-A using exact loaded key (handles naming variants).
+        if (_regionCtrl.text.trim().isEmpty) {
+          final defaultRegion =
+              _findRegionByAlias('Region IV-A') ??
+              (_regions.contains('Region IV-A') ? 'Region IV-A' : null);
+          if (defaultRegion != null) {
+            _regionCtrl.text = defaultRegion;
+            if (widget.currentData != null) {
+              widget.currentData!.region = defaultRegion;
+            }
+            _provinces = _locationService.getProvinces(defaultRegion);
+          }
+        }
+
         // After loading locations, populate dropdowns if we have currentData
         _loadDataAndPopulateDropdowns();
       });
@@ -148,6 +217,7 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
       _municipalities = [];
       _barangays = [];
     });
+    _autoSaveToCurrentData();
   }
 
   void _onProvinceChanged(String? provinceName) {
@@ -157,19 +227,32 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
       _provinceCtrl.text = provinceName;
       _municipalityCtrl.clear();
       _barangayCtrl.clear();
-      _municipalities = _locationService.getMunicipalities(_regionCtrl.text, provinceName);
+      _municipalities = _locationService.getMunicipalities(
+        _regionCtrl.text,
+        provinceName,
+      );
       _barangays = [];
     });
+    _autoSaveToCurrentData();
   }
 
   void _onMunicipalityChanged(String? municipalityName) {
-    if (municipalityName == null || _regionCtrl.text.isEmpty || _provinceCtrl.text.isEmpty) return;
+    if (municipalityName == null ||
+        _regionCtrl.text.isEmpty ||
+        _provinceCtrl.text.isEmpty) {
+      return;
+    }
 
     setState(() {
       _municipalityCtrl.text = municipalityName;
       _barangayCtrl.clear();
-      _barangays = _locationService.getBarangays(_regionCtrl.text, _provinceCtrl.text, municipalityName);
+      _barangays = _locationService.getBarangays(
+        _regionCtrl.text,
+        _provinceCtrl.text,
+        municipalityName,
+      );
     });
+    _autoSaveToCurrentData();
   }
 
   void _onBarangayChanged(String? barangayName) {
@@ -177,10 +260,18 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     setState(() {
       _barangayCtrl.text = barangayName;
     });
+    _autoSaveToCurrentData();
+  }
+
+  @override
+  void deactivate() {
+    _autoSaveToCurrentData();
+    super.deactivate();
   }
 
   @override
   void dispose() {
+    _autoSaveToCurrentData();
     _regionCtrl.dispose();
     _provinceCtrl.dispose();
     _municipalityCtrl.dispose();
@@ -214,12 +305,13 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
         );
       },
     );
-    
+
     if (picked != null) {
       setState(() {
-        _dateOfBirthCtrl.text = 
+        _dateOfBirthCtrl.text =
             '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
       });
+      _autoSaveToCurrentData();
     }
   }
 
@@ -229,10 +321,22 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     final isTablet = width > 600;
     final isLargeTablet = width > 900;
 
-    final double labelSize = isLargeTablet ? 16.0 : isTablet ? 15.0 : 14.0;
-    final double fieldGap = isLargeTablet ? 22.0 : isTablet ? 18.0 : 14.0;
+    final double labelSize = isLargeTablet
+        ? 16.0
+        : isTablet
+        ? 15.0
+        : 14.0;
+    final double fieldGap = isLargeTablet
+        ? 22.0
+        : isTablet
+        ? 18.0
+        : 14.0;
     final double labelFieldGap = isLargeTablet ? 8.0 : 6.0;
-    final double fieldHeight = isLargeTablet ? 54.0 : isTablet ? 50.0 : 44.0;
+    final double fieldHeight = isLargeTablet
+        ? 54.0
+        : isTablet
+        ? 50.0
+        : 44.0;
 
     // Lazy-load locations on first build (not in initState to avoid blocking UI)
     if (!_locationsLoaded && mounted) {
@@ -246,8 +350,8 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
       currentStep: 2,
       sectionTitle: 'Address',
       onNext: _handleNext,
-      onBack: widget.onBack,
-      onHeaderBack: widget.onHeaderBack,
+      onBack: _handleBack,
+      onHeaderBack: _handleHeaderBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -285,7 +389,9 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
           SizedBox(
             height: fieldHeight,
             child: _shadowedDropdown(
-              value: _municipalityCtrl.text.isEmpty ? null : _municipalityCtrl.text,
+              value: _municipalityCtrl.text.isEmpty
+                  ? null
+                  : _municipalityCtrl.text,
               hint: 'Select Municipality/City',
               items: _municipalities,
               onChanged: _onMunicipalityChanged,
@@ -345,6 +451,7 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
                 setState(() {
                   _selectedSex = value;
                 });
+                _autoSaveToCurrentData();
               },
             ),
           ),
@@ -368,6 +475,20 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     }
 
     widget.onNext();
+  }
+
+  void _handleBack() {
+    _autoSaveToCurrentData();
+    widget.onBack();
+  }
+
+  void _handleHeaderBack() {
+    _autoSaveToCurrentData();
+    if (widget.onHeaderBack != null) {
+      widget.onHeaderBack!();
+    } else {
+      widget.onBack();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -409,10 +530,7 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
           ),
         ],
       ),
-      child: CustomTextField(
-        controller: controller,
-        hintText: hint,
-      ),
+      child: CustomTextField(controller: controller, hintText: hint),
     );
   }
 
@@ -463,6 +581,16 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final uniqueItems = items.toSet().toList();
+    if (value != null &&
+        value.trim().isNotEmpty &&
+        !uniqueItems.contains(value)) {
+      uniqueItems.insert(0, value);
+    }
+    final safeValue = (value != null && uniqueItems.contains(value))
+        ? value
+        : null;
+
     return Container(
       decoration: BoxDecoration(
         color: DAColors.white,
@@ -482,7 +610,8 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        initialValue: value,
+        value: safeValue,
+        isExpanded: true,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(
@@ -492,7 +621,10 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
           ),
           filled: true,
           fillColor: DAColors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -512,14 +644,19 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
           fontWeight: FontWeight.w400,
         ),
         dropdownColor: DAColors.white,
-        icon: Icon(
-          Icons.arrow_drop_down,
-          color: DAColors.black,
-        ),
-        items: items.map((String item) {
+        icon: Icon(Icons.arrow_drop_down, color: DAColors.black),
+        selectedItemBuilder: (context) {
+          return uniqueItems.map((item) {
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: Text(item, maxLines: 1, overflow: TextOverflow.ellipsis),
+            );
+          }).toList();
+        },
+        items: uniqueItems.map((String item) {
           return DropdownMenuItem<String>(
             value: item,
-            child: Text(item),
+            child: Text(item, maxLines: 1, overflow: TextOverflow.ellipsis),
           );
         }).toList(),
         onChanged: onChanged,

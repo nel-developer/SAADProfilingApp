@@ -6,11 +6,14 @@ import 'package:da_project_1/widgets/stepper_header.dart';
 import 'package:da_project_1/screens/profiling/step_01_personal_info.dart';
 import 'package:da_project_1/screens/profiling/step_02_address_info.dart';
 import 'package:da_project_1/screens/profiling/step_03_other_personal.dart';
-import 'package:da_project_1/screens/profiling/step_04_main_commodity.dart';
-import 'package:da_project_1/screens/profiling/step_05_recurrence.dart';
-import 'package:da_project_1/screens/profiling/step_06_monthly_income.dart';
-import 'package:da_project_1/screens/profiling/step_07_farm_income.dart';
-import 'package:da_project_1/screens/profiling/step_08_signature.dart';
+import 'package:da_project_1/screens/profiling/step_04_saad_income.dart';
+import 'package:da_project_1/screens/profiling/step_05_nonsaad_commodities.dart';
+import 'package:da_project_1/screens/profiling/step_06_main_commodity.dart';
+import 'package:da_project_1/screens/profiling/step_07_cooperative.dart';
+import 'package:da_project_1/screens/profiling/step_07_recurrence.dart';
+import 'package:da_project_1/screens/profiling/step_08_farm_income.dart';
+import 'package:da_project_1/screens/profiling/step_09_monthly_income.dart';
+import 'package:da_project_1/screens/profiling/step_10_signature.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 import 'package:da_project_1/services/profiling_storage_service.dart';
 
@@ -18,7 +21,7 @@ import 'package:da_project_1/services/profiling_storage_service.dart';
 // PROFILING FLOW - Main Entry Point
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-/// ProfilingFlow - Parent widget that manages all 8 profiling steps
+/// ProfilingFlow - Parent widget that manages all 11 profiling steps
 class ProfilingFlow extends StatefulWidget {
   const ProfilingFlow({super.key});
 
@@ -31,6 +34,7 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
   ProfilingData _currentData = ProfilingData();
   final ProfilingStorageService _storage = ProfilingStorageService();
   bool _formSubmittedSuccessfully = false; // Track if form was submitted
+  final Set<int> _initializedSteps = {1};
 
   @override
   void initState() {
@@ -45,7 +49,9 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
     // User data is precious - keep it even if they navigate away
     // Only delete if user explicitly taps "Cancel" button
     if (_formSubmittedSuccessfully) {
-      debugPrint('✅ Form submitted successfully - draft will be shown as local unsync');
+      debugPrint(
+        '✅ Form submitted successfully - draft will be shown as local unsync',
+      );
     }
     super.dispose();
   }
@@ -66,111 +72,324 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
     }
   }
 
-  void _goToNextStep() {
-    if (_currentStep < 8) {
+  Future<void> _persistCurrentDraft() async {
+    try {
+      _currentData.status = 'Draft';
+      await _storage.saveDraftLocally(_currentData);
+    } catch (e) {
+      debugPrint('⚠️ Error persisting in-progress draft: $e');
+    }
+  }
+
+  void _goToNextStep() async {
+    await _persistCurrentDraft();
+    if (!mounted) return;
+
+    if (_currentStep < 11) {
+      final nextStep = _currentStep + 1;
       setState(() {
-        _currentStep++;
+        _currentStep = nextStep;
+        _initializedSteps.add(nextStep);
       });
     } else {
       _submitForm();
     }
   }
 
-  void _goToPreviousStep() {
+  void _goToPreviousStep() async {
+    await _persistCurrentDraft();
+    if (!mounted) return;
     if (_currentStep > 1) {
+      final previousStep = _currentStep - 1;
       setState(() {
-        _currentStep--;
+        _currentStep = previousStep;
+        _initializedSteps.add(previousStep);
       });
     }
   }
 
-  void _goToHome() {
-    // User clicked home button — ask if they want to keep or discard draft
-    showDialog(
+  Future<bool> _confirmLeaveProfiling() async {
+    final shouldExit = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Discard Draft?'),
-        content: const Text('Your unsaved data will be deleted. Continue?'),
+        title: const Text('Leave Profiling?'),
+        content: const Text(
+          'Are you sure you want to leave profiling? Your current inputs will be kept as a draft.',
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Keep Draft'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              try {
-                await _storage.deleteDraftLocally();
-                debugPrint('✅ Draft deleted by user request');
-                if (!mounted) return;
-                Navigator.pop(context);
-              } catch (e) {
-                debugPrint('⚠️ Error deleting draft: $e');
-                if (!mounted) return;
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Yes, Leave'),
           ),
         ],
       ),
     );
+
+    return shouldExit == true;
+  }
+
+  Future<bool> _handleSystemBack() async {
+    if (_currentStep > 1) {
+      _goToPreviousStep();
+      return false;
+    }
+
+    final shouldExit = await _confirmLeaveProfiling();
+    if (!shouldExit) {
+      return false;
+    }
+
+    try {
+      await _persistCurrentDraft();
+      debugPrint('✅ Draft persisted on system back exit');
+    } catch (e) {
+      debugPrint('⚠️ Error persisting draft on system back exit: $e');
+    }
+
+    return true;
+  }
+
+  Widget _buildStepWidget(int step) {
+    switch (step) {
+      case 1:
+        return Step01PersonalInfo(
+          key: const ValueKey('profiling-step-1'),
+          onNext: _goToNextStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 2:
+        return Step02AddressInfo(
+          key: const ValueKey('profiling-step-2'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 3:
+        return Step03OtherPersonal(
+          key: const ValueKey('profiling-step-3'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 4:
+        return Step04SAAdIncome(
+          key: const ValueKey('profiling-step-4'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 5:
+        return Step05NonSAADCommodities(
+          key: const ValueKey('profiling-step-5'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 6:
+        return Step06MainCommodity(
+          key: const ValueKey('profiling-step-6'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 7:
+        return Step07Cooperative(
+          key: const ValueKey('profiling-step-7'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 8:
+        return Step07Recurrence(
+          key: const ValueKey('profiling-step-8'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 9:
+        return Step08FarmIncome(
+          key: const ValueKey('profiling-step-9'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 10:
+        return Step09MonthlyIncome(
+          key: const ValueKey('profiling-step-10'),
+          onNext: _goToNextStep,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      case 11:
+        return Step10Signature(
+          key: const ValueKey('profiling-step-11'),
+          onNext: _submitForm,
+          onBack: _goToPreviousStep,
+          onHeaderBack: _goToHome,
+          currentData: _currentData,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  void _goToHome() async {
+    final shouldExit = await _confirmLeaveProfiling();
+
+    if (shouldExit != true || !mounted) return;
+
+    try {
+      await _persistCurrentDraft();
+      debugPrint('✅ Draft persisted on profiling exit');
+    } catch (e) {
+      debugPrint('⚠️ Error persisting draft on profiling exit: $e');
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   Future<void> _submitForm() async {
     // Centralized final validation before saving
     final missing = <int, List<String>>{};
+    final isExistingFarmer = _currentData.isExistingFarmer == true;
 
     void addMissing(int step, String label) {
       missing.putIfAbsent(step, () => []).add(label);
     }
 
     // Step 1 - Personal Info
-    if (_currentData.firstName == null || _currentData.firstName!.trim().isEmpty) addMissing(1, 'First Name');
-    if (_currentData.middleName == null || _currentData.middleName!.trim().isEmpty) addMissing(1, 'Middle Name');
-    if (_currentData.surname == null || _currentData.surname!.trim().isEmpty) addMissing(1, 'Surname');
-    // extensionName is exempt
-    if (_currentData.dateOfBirth == null || _currentData.dateOfBirth!.trim().isEmpty) addMissing(1, 'Date of Birth');
-    if (_currentData.sex == null || _currentData.sex!.trim().isEmpty) addMissing(1, 'Sex');
+    if (isExistingFarmer) {
+      final selectedExistingSaadId =
+          _currentData.selectedExistingSaadId?.trim() ?? '';
+      final saadIdNo = _currentData.saadIdNo?.trim() ?? '';
+      if (selectedExistingSaadId.isEmpty && saadIdNo.isEmpty) {
+        addMissing(1, 'Existing Farmer (SAAD I.D No.)');
+      }
+    } else {
+      if (_currentData.firstName == null ||
+          _currentData.firstName!.trim().isEmpty) {
+        addMissing(1, 'First Name');
+      }
+      // middleName is exempt
+      if (_currentData.surname == null ||
+          _currentData.surname!.trim().isEmpty) {
+        addMissing(1, 'Surname');
+      }
+      // extensionName is exempt
+      if (_currentData.dateOfBirth == null ||
+          _currentData.dateOfBirth!.trim().isEmpty) {
+        addMissing(1, 'Date of Birth');
+      }
+      if (_currentData.sex == null || _currentData.sex!.trim().isEmpty) {
+        addMissing(1, 'Sex');
+      }
+    }
 
     // Step 2 - Address (optional)
     // Address fields are intentionally optional; do not block submission if empty.
 
     // Step 3 - Other Personal
-    if (_currentData.isIndigenous == null) addMissing(3, 'Is Indigenous');
-    if ((_currentData.isIndigenous ?? false) && (_currentData.indigenousGroup == null || _currentData.indigenousGroup!.trim().isEmpty)) addMissing(3, 'Indigenous Group');
-    if (_currentData.isPWD == null) addMissing(3, 'Is PWD');
-    // spouseName is exempt (not required)
-    if (_currentData.tribeEthnicity == null || _currentData.tribeEthnicity!.trim().isEmpty) addMissing(3, 'Tribe / Ethnicity');
+    if (!isExistingFarmer) {
+      if (_currentData.isIndigenous == null) addMissing(3, 'Is Indigenous');
+      if ((_currentData.isIndigenous ?? false) &&
+          (_currentData.indigenousGroup == null ||
+              _currentData.indigenousGroup!.trim().isEmpty)) {
+        addMissing(3, 'Indigenous Group');
+      }
+      if (_currentData.isPWD == null) addMissing(3, 'Is PWD');
+      // spouseName is exempt (not required)
+      if (_currentData.tribeEthnicity == null ||
+          _currentData.tribeEthnicity!.trim().isEmpty) {
+        addMissing(3, 'Tribe / Ethnicity');
+      }
+    }
 
-    // Step 4 - Main Commodity
-    if (_currentData.primaryCommodity == null || _currentData.primaryCommodity!.trim().isEmpty) addMissing(4, 'Primary Commodity');
-    if (_currentData.secondaryCommodity == null || _currentData.secondaryCommodity!.trim().isEmpty) addMissing(4, 'Secondary Commodity');
+    // Step 4 - SAAD Commodity Type (dropdown required)
+    if (_currentData.saadCommodityType == null ||
+        _currentData.saadCommodityType!.trim().isEmpty) {
+      addMissing(4, 'SAAD Commodity Type');
+    }
 
-    // Step 5 - Farm/Fisheries Income (no required breakdown fields; optional)
+    // Step 5 - Non-SAAD Commodity Type (dropdown required)
+    if (_currentData.nonSAADCommodityType == null ||
+        _currentData.nonSAADCommodityType!.trim().isEmpty) {
+      addMissing(5, 'Non-SAAD Commodity Type');
+    }
 
-    // Step 6 - Recurrence
-    if (_currentData.maleFamilyMembers == null) addMissing(6, 'No. of Male Family Members');
-    if (_currentData.femaleFamilyMembers == null) addMissing(6, 'No. of Female Family Members');
-    if (_currentData.yearsInFarming == null) addMissing(6, 'Years in Farming');
-    if (_currentData.landTenureship == null || _currentData.landTenureship!.trim().isEmpty) addMissing(6, 'Land Tenureship');
-    if (_currentData.landTenureship == 'Other' && (_currentData.landTenureshipOthers == null || _currentData.landTenureshipOthers!.trim().isEmpty)) addMissing(6, 'Land Tenureship (Other)');
-    if (_currentData.secondaryCommodityRecurrence == null || _currentData.secondaryCommodityRecurrence!.trim().isEmpty) addMissing(6, 'Secondary Commodity (Recurrence)');
-    if (_currentData.yearCovered == null) addMissing(6, 'Year Covered');
-    if (_currentData.receivedCommodity == null || _currentData.receivedCommodity!.trim().isEmpty) addMissing(6, 'Received Commodity');
+    // Step 6 - Main Commodity
+    if (!isExistingFarmer) {
+      if (_currentData.primaryCommodity == null ||
+          _currentData.primaryCommodity!.trim().isEmpty) {
+        addMissing(6, 'Primary Commodity');
+      }
+      if (_currentData.secondaryCommodity == null ||
+          _currentData.secondaryCommodity!.trim().isEmpty) {
+        addMissing(6, 'Secondary Commodity');
+      }
+    }
 
-    // Step 7 - Monthly Income
-    if (_currentData.agriRelatedIncome == null) addMissing(7, 'Agri-Related Income');
-    if (_currentData.saadNetIncome == null) addMissing(7, 'SAAD Net Income');
-    if (_currentData.nonAgriRelatedIncome == null) addMissing(7, 'Non-Agri Related Income');
-    if (_currentData.mainSourcesOfIncome == null || _currentData.mainSourcesOfIncome!.trim().isEmpty) addMissing(7, 'Main Sources of Income');
+    // Step 8 - Recurrence
+    if (_currentData.maleFamilyMembers == null) {
+      addMissing(8, 'No. of Male Family Members');
+    }
+    if (_currentData.femaleFamilyMembers == null) {
+      addMissing(8, 'No. of Female Family Members');
+    }
+    if (_currentData.yearsInFarming == null) addMissing(8, 'Years in Farming');
+    if (_currentData.landTenureship == null ||
+        _currentData.landTenureship!.trim().isEmpty) {
+      addMissing(8, 'Land Tenureship');
+    }
+    if (_currentData.landTenureship == 'Other' &&
+        (_currentData.landTenureshipOthers == null ||
+            _currentData.landTenureshipOthers!.trim().isEmpty)) {
+      addMissing(8, 'Land Tenureship (Other)');
+    }
+    if (_currentData.yearCovered == null) addMissing(8, 'Year Covered');
+    // Received Commodity is optional.
 
-    // Step 8 - Signature
-    if (_currentData.idType == null || _currentData.idType!.trim().isEmpty) addMissing(8, 'ID Type');
-    if (_currentData.idFrontImagePath == null || _currentData.idFrontImagePath!.trim().isEmpty) addMissing(8, 'ID Front Photo');
-    if (_currentData.idBackImagePath == null || _currentData.idBackImagePath!.trim().isEmpty) addMissing(8, 'ID Back Photo');
-    if (_currentData.farmerPhotoPath == null || _currentData.farmerPhotoPath!.trim().isEmpty) addMissing(8, 'Farmer Photo');
-    if ((_currentData.signatureImagePath == null || _currentData.signatureImagePath!.trim().isEmpty) && (_currentData.signatureImage == null)) addMissing(8, 'Signature');
+    // Step 10 - Monthly Income
+    if (!isExistingFarmer) {
+      if (_currentData.agriRelatedIncome == null) {
+        addMissing(10, 'Agri-Related Income');
+      }
+      if (_currentData.nonAgriRelatedIncome == null) {
+        addMissing(10, 'Non-Agri Related Income');
+      }
+      if (_currentData.mainSourcesOfIncome == null ||
+          _currentData.mainSourcesOfIncome!.trim().isEmpty) {
+        addMissing(10, 'Main Sources of Income');
+      }
+    }
+
+    // Step 9 - Farm/Fisheries Income (no required breakdown fields; optional)
+
+    // Step 11 - Signature / Images
+    if (!isExistingFarmer) {
+      if (_currentData.farmerPhotoPath == null ||
+          _currentData.farmerPhotoPath!.trim().isEmpty) {
+        addMissing(11, 'Farmer Photo');
+      }
+    }
+    if ((_currentData.signatureImagePath == null ||
+            _currentData.signatureImagePath!.trim().isEmpty) &&
+        (_currentData.signatureImage == null)) {
+      addMissing(11, 'Signature');
+    }
 
     if (missing.isNotEmpty) {
       // Build a grouped message showing step and fields
@@ -189,7 +408,10 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
           title: const Text('Cannot Submit — Missing Fields'),
           content: SingleChildScrollView(child: Text(buffer.toString())),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
           ],
         ),
       );
@@ -206,23 +428,28 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder(builder: (context, setState) {
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              LinearProgressIndicator(value: stageValue <= 0 ? null : stageValue),
-              const SizedBox(height: 16),
-              Text(stageLabel, style: const TextStyle(fontSize: 14)),
-              const SizedBox(height: 12),
-            ],
-          ),
-        );
-      }),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: stageValue <= 0 ? null : stageValue,
+                ),
+                const SizedBox(height: 16),
+                Text(stageLabel, style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 12),
+              ],
+            ),
+          );
+        },
+      ),
     );
 
     try {
+      _currentData.status = 'Unsync';
       // Save locally only (do NOT auto-sync to Firestore). Keep setAsCurrent=false
       // so this saved profile is treated as an Unsync entry and not the current in-progress draft.
       await _storage.saveDraftLocally(_currentData, setAsCurrent: false);
@@ -235,11 +462,22 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Saved Locally'),
-          content: const Text('Profile saved locally as Unsync. You can sync later from the Data screen.'),
+          content: const Text(
+            'Profile saved locally as Unsync. You can sync later from the Data screen.',
+          ),
           actions: [
             TextButton(
               onPressed: () async {
                 Navigator.pop(dialogContext); // Close dialog
+                try {
+                  // Clear only in-progress draft(s) after successful save.
+                  await _storage.deleteDraftLocally();
+                  debugPrint('✅ In-progress draft cleared after submit');
+                } catch (e) {
+                  debugPrint(
+                    '⚠️ Could not clear in-progress draft after submit: $e',
+                  );
+                }
                 // Mark as successfully submitted so dispose() won't delete it
                 _formSubmittedSuccessfully = true;
                 // Reset form for new entry and navigate back
@@ -259,92 +497,29 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
     } catch (e) {
       if (mounted) Navigator.pop(context); // Close progress dialog
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving form: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving form: $e')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Build only the current step widget (lazy loading for performance)
-    // Shared _currentData object persists all entered data across step navigation
-    Widget currentStepWidget;
-    
-    switch (_currentStep) {
-      case 1:
-        currentStepWidget = Step01PersonalInfo(
-          onNext: _goToNextStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 2:
-        currentStepWidget = Step02AddressInfo(
-          onNext: _goToNextStep,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 3:
-        currentStepWidget = Step03OtherPersonal(
-          onNext: _goToNextStep,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 4:
-        currentStepWidget = Step04MainCommodity(
-          onNext: _goToNextStep,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 5:
-        currentStepWidget = Step05Recurrence(
-          onNext: _goToNextStep,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 6:
-        currentStepWidget = Step06MonthlyIncome(
-          onNext: _goToNextStep,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 7:
-        currentStepWidget = Step07FarmIncome(
-          onNext: _goToNextStep,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      case 8:
-        currentStepWidget = Step08Signature(
-          onNext: _submitForm,
-          onBack: _goToPreviousStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-        break;
-      default:
-        currentStepWidget = Step01PersonalInfo(
-          onNext: _goToNextStep,
-          onHeaderBack: _goToHome,
-          currentData: _currentData,
-        );
-    }
+    _initializedSteps.add(_currentStep);
+    final stepWidgets = List<Widget>.generate(11, (i) {
+      final step = i + 1;
+      if (!_initializedSteps.contains(step)) {
+        return const SizedBox.shrink();
+      }
+      return _buildStepWidget(step);
+    });
 
-    return currentStepWidget;
+    final index = (_currentStep - 1).clamp(0, stepWidgets.length - 1);
+    return WillPopScope(
+      onWillPop: _handleSystemBack,
+      child: IndexedStack(index: index, children: stepWidgets),
+    );
   }
 }
 
@@ -435,13 +610,15 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
     // Form body animations
     _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-          parent: _ctrl,
-          curve: const Interval(0.3, 0.9, curve: Curves.easeOut)),
+        parent: _ctrl,
+        curve: const Interval(0.3, 0.9, curve: Curves.easeOut),
+      ),
     );
     _slideAnim = Tween<double>(begin: 30.0, end: 0.0).animate(
       CurvedAnimation(
-          parent: _ctrl,
-          curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
+        parent: _ctrl,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _ctrl.forward();
@@ -464,21 +641,52 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
     final isLargeTablet = width > 900;
 
     // Header sizing
-    final headerHeight = height * (isLargeTablet ? 0.18 : isTablet ? 0.22 : 0.28);
-    final titleFontSize = isLargeTablet ? 36.0 : isTablet ? 30.0 : width * 0.065;
-    final subtitleFontSize = isLargeTablet ? 14.0 : isTablet ? 12.0 : width * 0.03;
+    final headerHeight =
+        height *
+        (isLargeTablet
+            ? 0.18
+            : isTablet
+            ? 0.22
+            : 0.28);
+    final titleFontSize = isLargeTablet
+        ? 36.0
+        : isTablet
+        ? 30.0
+        : width * 0.065;
+    final subtitleFontSize = isLargeTablet
+        ? 14.0
+        : isTablet
+        ? 12.0
+        : width * 0.03;
     final backButtonSize = isTablet ? 28.0 : 24.0;
 
     // Content sizing
     final contentHPad = width * 0.06;
-    final sectionTitleSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
+    final sectionTitleSize = isLargeTablet
+        ? 20.0
+        : isTablet
+        ? 18.0
+        : 17.0;
     final sectionSpacing = isTablet ? 18.0 : 14.0;
 
     // Bottom buttons
     final bottomPad = isTablet ? 28.0 : 24.0;
-    final nextHeight = isLargeTablet ? 56.0 : isTablet ? 52.0 : 50.0;
-    final nextFontSize = isLargeTablet ? 18.0 : isTablet ? 17.0 : 16.0;
-    final backFontSize = isLargeTablet ? 15.0 : isTablet ? 14.0 : 13.0;
+    final safeBottomInset = MediaQuery.of(context).padding.bottom;
+    final nextHeight = isLargeTablet
+        ? 56.0
+        : isTablet
+        ? 52.0
+        : 50.0;
+    final nextFontSize = isLargeTablet
+        ? 18.0
+        : isTablet
+        ? 17.0
+        : 16.0;
+    final backFontSize = isLargeTablet
+        ? 15.0
+        : isTablet
+        ? 14.0
+        : 13.0;
 
     return Scaffold(
       backgroundColor: DAColors.lightGrey,
@@ -522,7 +730,8 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                         children: [
                           /// BACK BUTTON
                           GestureDetector(
-                            onTap: widget.onHeaderBack ??
+                            onTap:
+                                widget.onHeaderBack ??
                                 () => Navigator.pop(context),
                             child: Container(
                               padding: const EdgeInsets.all(12),
@@ -593,7 +802,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
           // ==============================================================
           // 2. ANIMATED LINE PROGRESS BAR
           // ==============================================================
-          StepperHeader(currentStep: widget.currentStep),
+          StepperHeader(currentStep: widget.currentStep, totalSteps: 11),
 
           // ==============================================================
           // 3. SCROLLABLE FORM BODY  â€” fade + slide up on entry
@@ -660,7 +869,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               contentHPad,
               12.0,
               contentHPad,
-              bottomPad,
+              bottomPad + safeBottomInset,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -668,7 +877,10 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
               children: [
                 // â”€â”€ NEXT â”€â”€
                 GestureDetector(
-                  onTap: widget.onNext,
+                  onTap: () {
+                    FocusScope.of(context).unfocus();
+                    widget.onNext();
+                  },
                   child: Container(
                     height: nextHeight,
                     decoration: BoxDecoration(
@@ -684,7 +896,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                     ),
                     child: Center(
                       child: Text(
-                        widget.currentStep < 8 ? 'Next' : 'Submit',
+                        widget.currentStep < 11 ? 'Next' : 'Submit',
                         style: GoogleFonts.poppins(
                           fontSize: nextFontSize,
                           fontWeight: FontWeight.w700,
@@ -700,7 +912,10 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                   const SizedBox(height: 18),
                   Center(
                     child: GestureDetector(
-                      onTap: widget.onBack,
+                      onTap: () {
+                        FocusScope.of(context).unfocus();
+                        widget.onBack?.call();
+                      },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           vertical: 4,

@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -13,6 +15,8 @@ import 'package:da_project_1/screens/data/data_view_modal.dart';
 import 'package:da_project_1/services/profiling_storage_service.dart';
 import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'package:da_project_1/models/profiling_data.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 class DataScreen extends StatefulWidget {
   const DataScreen({super.key});
@@ -47,23 +51,286 @@ class _DataScreenState extends State<DataScreen>
   bool _loadingApproved = false;
   bool _isOnline = true; // Default to true, will be checked on init
 
+  bool _isUnsyncLocalRecord(ProfilingData data) {
+    final status = (data.status ?? '').trim().toLowerCase();
+    if (status.isEmpty || status == 'draft') {
+      return false;
+    }
+
+    // Keep Unsync tab resilient for legacy/local variants after app restarts.
+    if (status == 'unsync' || status == 'unsynced') {
+      return true;
+    }
+
+    // Exclude cloud workflow states from local Unsync tab.
+    if (status == 'pending approval' ||
+        status == 'pending' ||
+        status == 'approved') {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool _asSuccess(dynamic result) {
+    if (result is bool) return result;
+    try {
+      return result != null && (result as dynamic).success == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _csvCell(dynamic value) {
+    final raw = (value ?? '').toString();
+    final escaped = raw.replaceAll('"', '""');
+    return '"$escaped"';
+  }
+
+  String _formatDateOnly(DateTime? value) {
+    if (value == null) return '';
+    return value.toIso8601String().split('T').first;
+  }
+
+  Future<void> _downloadApprovedBasicInformation() async {
+    try {
+      List<ProfilingData> approvedProfiles = [];
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (_isOnline && user != null) {
+        approvedProfiles = await _storage.loadApprovedProfiles(user.uid);
+      } else {
+        approvedProfiles = _approvedData
+            .map((entry) => entry['data'])
+            .whereType<ProfilingData>()
+            .toList();
+      }
+
+      if (approvedProfiles.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No approved profiles found to export.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final header = [
+        'SAAD ID No',
+        'RSBSA/FISHR ID No',
+        'First Name',
+        'Middle Name',
+        'Surname',
+        'Extension Name',
+        'Sex',
+        'Date of Birth',
+        'Region',
+        'Province',
+        'Municipality',
+        'Barangay',
+        'Sitio/Purok',
+        'Spouse Name',
+        'Main Sources of Income',
+        'Enumerator',
+        'Approved By',
+        'Approved At',
+      ];
+
+      final csv = StringBuffer()..writeln(header.map(_csvCell).join(','));
+
+      for (final profile in approvedProfiles) {
+        csv.writeln(
+          [
+            profile.saadIdNo,
+            profile.rsbsaFishrIdNo,
+            profile.firstName,
+            profile.middleName,
+            profile.surname,
+            profile.extensionName,
+            profile.sex,
+            profile.dateOfBirth,
+            profile.region,
+            profile.province,
+            profile.municipality,
+            profile.barangay,
+            profile.sitioPurok,
+            profile.spouseName,
+            profile.mainSourcesOfIncome,
+            profile.enumeratorEmail,
+            profile.approverEmail,
+            _formatDateOnly(profile.approvedAt),
+          ].map(_csvCell).join(','),
+        );
+      }
+
+      if (kIsWeb) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'CSV export to file is available on mobile/desktop app.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+
+      Directory outputDir;
+      if (Platform.isWindows) {
+        final userProfile = Platform.environment['USERPROFILE'];
+        final downloadsPath = (userProfile != null && userProfile.isNotEmpty)
+            ? '$userProfile\\Downloads'
+            : Directory.current.path;
+        outputDir = Directory(downloadsPath);
+      } else {
+        outputDir =
+            await getDownloadsDirectory() ??
+            await getApplicationDocumentsDirectory();
+      }
+
+      if (!await outputDir.exists()) {
+        await outputDir.create(recursive: true);
+      }
+
+      final filePath = p.join(
+        outputDir.path,
+        'approved_basic_information_$timestamp.csv',
+      );
+      final file = File(filePath);
+      await file.writeAsString(csv.toString());
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Downloaded: $filePath'),
+          backgroundColor: DAColors.primaryGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to export approved basic info: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _ensureRequiredIdsBeforeApproval(ProfilingData data) async {
+    if (!mounted) return false;
+
+    String rsbsa = data.rsbsaFishrIdNo?.trim() ?? '';
+    String saad = data.saadIdNo?.trim() ?? '';
+    String? errorText;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Required Before Approval'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Please provide these IDs to approve profile:'),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: rsbsa,
+                    decoration: const InputDecoration(
+                      labelText: 'RSBSA / FISHR ID No.',
+                      helperText: 'Optional',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      rsbsa = value;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    initialValue: saad,
+                    decoration: InputDecoration(
+                      labelText: 'SAAD I.D No.',
+                      border: const OutlineInputBorder(),
+                      errorText: errorText,
+                    ),
+                    onChanged: (value) {
+                      saad = value;
+                      if (errorText != null) {
+                        setDialogState(() {
+                          errorText = null;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final trimmedRsbsa = rsbsa.trim();
+                    final trimmedSaad = saad.trim();
+
+                    if (trimmedSaad.isEmpty) {
+                      setDialogState(() {
+                        errorText = 'SAAD I.D No. is required.';
+                      });
+                      return;
+                    }
+
+                    FocusScope.of(dialogContext).unfocus();
+                    data.rsbsaFishrIdNo = trimmedRsbsa.isEmpty
+                        ? null
+                        : trimmedRsbsa;
+                    data.saadIdNo = trimmedSaad;
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text('Continue'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted) return false;
+    return result ?? false;
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Check initial connectivity
     _checkConnectivity();
-    
+
     // Listen to connectivity changes
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((result) {
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
+      result,
+    ) {
       final isOnline = result != ConnectivityResult.none;
       if (_isOnline != isOnline) {
         setState(() {
           _isOnline = isOnline;
-          debugPrint('🌐 Connectivity changed: ${isOnline ? 'ONLINE' : 'OFFLINE'}');
+          debugPrint(
+            '🌐 Connectivity changed: ${isOnline ? 'ONLINE' : 'OFFLINE'}',
+          );
         });
-        
+
         // Clear Pending/Approved data when going offline
         if (!isOnline) {
           setState(() {
@@ -75,7 +342,7 @@ class _DataScreenState extends State<DataScreen>
         }
       }
     });
-    
+
     // Load data without awaiting to avoid blocking UI
     _loadProfilingData();
     _controller = AnimationController(
@@ -119,43 +386,44 @@ class _DataScreenState extends State<DataScreen>
       final result = await _connectivity.checkConnectivity();
       setState(() {
         _isOnline = result != ConnectivityResult.none;
-        debugPrint('🌐 Initial connectivity: ${_isOnline ? 'ONLINE' : 'OFFLINE'}');
+        debugPrint(
+          '🌐 Initial connectivity: ${_isOnline ? 'ONLINE' : 'OFFLINE'}',
+        );
       });
     } catch (e) {
       debugPrint('⚠️ Error checking connectivity: $e');
     }
   }
 
-  
-
   Future<void> _loadProfilingData() async {
     try {
       await _storage.init();
-      
+
       // INSTANT LOAD: Load local Unsync profiles only (no network needed)
       // Only load if Unsync tab is selected or on init
-      if (_selectedFilter == 'Unsync' || _selectedFilter == 'All') {
+      if (_selectedFilter == 'Unsync') {
         try {
           final diskDrafts = await _storage.loadDraftsFromDiskOnly();
-          debugPrint('✅ Loaded ${diskDrafts.length} local Unsync profile(s) from disk');
-          
+          final unsyncDrafts = diskDrafts.where(_isUnsyncLocalRecord).toList();
+          debugPrint(
+            '✅ Loaded ${unsyncDrafts.length} local Unsync profile(s) from disk',
+          );
+
           if (mounted) {
             setState(() {
-              _unsyncData = diskDrafts.map((d) {
-                d.status ??= 'Unsync';
-                return _buildDataMap(d);
-              }).toList();
+              _unsyncData = unsyncDrafts.map(_buildDataMap).toList();
             });
           }
-          debugPrint('✅ Unsync tab ready with ${_unsyncData.length} local profiles');
+          debugPrint(
+            '✅ Unsync tab ready with ${_unsyncData.length} local profiles',
+          );
         } catch (e) {
           debugPrint('❌ Error loading disk drafts: $e');
         }
       }
-      
+
       // NOTE: Pending and Approved data are loaded ONLY when user clicks their tabs
       // See: onTap handlers in FilterTab widgets below
-      
     } catch (e) {
       debugPrint('❌ Error in _loadProfilingData: $e');
     }
@@ -170,10 +438,12 @@ class _DataScreenState extends State<DataScreen>
       setState(() {
         _loadingPending = true;
       });
-      
+
       List<ProfilingData> pendingDrafts = [];
       try {
-        pendingDrafts = await _storage.loadPendingProfiles().timeout(const Duration(seconds: 15));
+        pendingDrafts = await _storage.loadPendingProfiles().timeout(
+          const Duration(seconds: 15),
+        );
       } on TimeoutException {
         if (mounted) {
           setState(() {
@@ -181,15 +451,19 @@ class _DataScreenState extends State<DataScreen>
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('⏱️ Loading pending profiles timed out. Try again.'),
+              content: Text(
+                '⏱️ Loading pending profiles timed out. Try again.',
+              ),
               backgroundColor: Colors.orange,
             ),
           );
         }
         return;
       }
-      debugPrint('✅ Loaded ${pendingDrafts.length} pending profile(s) from Firebase');
-      
+      debugPrint(
+        '✅ Loaded ${pendingDrafts.length} pending profile(s) from Firebase',
+      );
+
       if (mounted) {
         final newList = pendingDrafts.map((d) {
           d.status = 'Pending Approval';
@@ -225,7 +499,9 @@ class _DataScreenState extends State<DataScreen>
       if (user != null) {
         List<ProfilingData> approvedDrafts = [];
         try {
-          approvedDrafts = await _storage.loadApprovedProfiles(user.uid).timeout(const Duration(seconds: 15));
+          approvedDrafts = await _storage
+              .loadApprovedProfiles(user.uid)
+              .timeout(const Duration(seconds: 15));
         } on TimeoutException {
           if (mounted) {
             setState(() {
@@ -233,7 +509,9 @@ class _DataScreenState extends State<DataScreen>
             });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('⏱️ Loading approved profiles timed out. Try again.'),
+                content: Text(
+                  '⏱️ Loading approved profiles timed out. Try again.',
+                ),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -241,7 +519,9 @@ class _DataScreenState extends State<DataScreen>
           return;
         }
 
-        debugPrint('✅ Loaded ${approvedDrafts.length} approved profile(s) from Firebase');
+        debugPrint(
+          '✅ Loaded ${approvedDrafts.length} approved profile(s) from Firebase',
+        );
 
         if (mounted) {
           final newList = approvedDrafts.map((d) {
@@ -274,7 +554,7 @@ class _DataScreenState extends State<DataScreen>
   Map<String, dynamic> _buildDataMap(ProfilingData draft) {
     // Determine status based on the status field only
     String status = draft.status ?? 'Unsync';
-    
+
     // Map status values for display
     if (status == 'Approved') {
       status = 'Approved';
@@ -284,10 +564,14 @@ class _DataScreenState extends State<DataScreen>
       status = 'Unsync';
     }
 
-    debugPrint('📝 Draft: ${draft.firstName} ${draft.surname} - Status: $status (dbStatus: ${draft.status})');
+    debugPrint(
+      '📝 Draft: ${draft.firstName} ${draft.surname} - Status: $status (dbStatus: ${draft.status})',
+    );
 
     return {
-      'farmerName': '${draft.firstName ?? ''} ${draft.middleName ?? ''} ${draft.surname ?? ''}'.trim(),
+      'farmerName':
+          '${draft.firstName ?? ''} ${draft.middleName ?? ''} ${draft.surname ?? ''}'
+              .trim(),
       'location': '${draft.municipality ?? ''}, ${draft.province ?? ''}',
       'commodity': draft.primaryCommodity ?? 'N/A',
       'enumerator': draft.enumeratorEmail ?? 'Current User',
@@ -296,7 +580,6 @@ class _DataScreenState extends State<DataScreen>
       'data': draft,
     };
   }
-
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -322,17 +605,21 @@ class _DataScreenState extends State<DataScreen>
   }
 
   double _scale(BuildContext context) {
-    final scaleW =
-        (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
-    final scaleH =
-        (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
+      0.5,
+      2.0,
+    );
+    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(
+      0.5,
+      2.0,
+    );
     return min(scaleW, scaleH);
   }
 
   Future<bool> _canApproveProfiles() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
-    
+
     final role = await _authService.getUserRole(user.uid);
     final roleLower = role?.toLowerCase();
     return roleLower == 'admin' || roleLower == 'moderator';
@@ -360,9 +647,9 @@ class _DataScreenState extends State<DataScreen>
   void _openDataViewModal(Map<String, dynamic> data) async {
     // Check if user can approve profiles (only Moderators and Admins)
     final canApprove = await _canApproveProfiles();
-    
+
     if (!mounted) return;
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -379,10 +666,13 @@ class _DataScreenState extends State<DataScreen>
             );
           },
           onSync: () async {
+            bool loadingDialogShown = false;
+            BuildContext? loadingDialogContext;
             try {
               final user = FirebaseAuth.instance.currentUser;
-              
+
               if (user == null) {
+                if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('❌ Not logged in'),
@@ -393,20 +683,24 @@ class _DataScreenState extends State<DataScreen>
               }
 
               final profilingData = data['data'] as ProfilingData;
-              
+
               // Show loading dialog
               if (!mounted) return;
               showDialog(
                 context: context,
                 barrierDismissible: false,
+                useRootNavigator: true,
                 builder: (dialogContext) {
+                  loadingDialogContext = dialogContext;
                   return AlertDialog(
                     content: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const SizedBox(height: 16),
                         const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(DAColors.primaryGreen),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            DAColors.primaryGreen,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         const Text(
@@ -423,24 +717,56 @@ class _DataScreenState extends State<DataScreen>
                   );
                 },
               );
-              
+              loadingDialogShown = true;
+
               try {
-                final success = await _storage.syncToFirestore(profilingData, user.uid);
-                
+                final bool isExistingFarmer =
+                    profilingData.isExistingFarmer == true;
+                final syncResult = isExistingFarmer
+                    ? await _storage.syncExistingRecurrenceToApproved(
+                        profilingData,
+                        user.uid,
+                      )
+                    : await _storage.syncToFirestore(profilingData, user.uid);
+                final bool success = _asSuccess(syncResult);
+
                 if (!mounted) return;
-                Navigator.pop(context); // Close the loading dialog
-                
+                if (loadingDialogShown &&
+                    loadingDialogContext != null &&
+                    Navigator.of(
+                      loadingDialogContext!,
+                      rootNavigator: true,
+                    ).canPop()) {
+                  Navigator.of(
+                    loadingDialogContext!,
+                    rootNavigator: true,
+                  ).pop();
+                  loadingDialogShown = false;
+                  loadingDialogContext = null;
+                }
+
                 if (success) {
-                  Navigator.pop(context); // Close the modal
+                  if (isExistingFarmer) {
+                    profilingData.status = 'Approved';
+                    await _storage.saveDraftLocally(
+                      profilingData,
+                      setAsCurrent: false,
+                    );
+                  }
+
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop(); // Close the modal
+                  }
                   await Future.delayed(const Duration(milliseconds: 300));
-                  
+
                   if (mounted) {
-                    // Local copy retained per user preference; do not delete automatically
-                    debugPrint('ℹ️ Local copy retained after sync for offline reference');
-                    
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Data synced successfully'),
+                      SnackBar(
+                        content: Text(
+                          isExistingFarmer
+                              ? '✅ Recurrence synced and auto-approved'
+                              : '✅ Data synced successfully',
+                        ),
                         backgroundColor: DAColors.primaryGreen,
                       ),
                     );
@@ -450,8 +776,12 @@ class _DataScreenState extends State<DataScreen>
                     } else if (_selectedFilter == 'Unsync') {
                       await _loadProfilingData();
                     }
+                    if (isExistingFarmer) {
+                      await _loadApprovedProfiles();
+                    }
                   }
                 } else {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('❌ Sync failed. Check your connection.'),
@@ -461,7 +791,19 @@ class _DataScreenState extends State<DataScreen>
                 }
               } on TimeoutException {
                 if (!mounted) return;
-                Navigator.pop(context); // Close the loading dialog
+                if (loadingDialogShown &&
+                    loadingDialogContext != null &&
+                    Navigator.of(
+                      loadingDialogContext!,
+                      rootNavigator: true,
+                    ).canPop()) {
+                  Navigator.of(
+                    loadingDialogContext!,
+                    rootNavigator: true,
+                  ).pop();
+                  loadingDialogShown = false;
+                  loadingDialogContext = null;
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('⏱️ Sync taking too long. Try again.'),
@@ -471,7 +813,16 @@ class _DataScreenState extends State<DataScreen>
               }
             } catch (e) {
               if (!mounted) return;
-              Navigator.pop(context);
+              if (loadingDialogShown &&
+                  loadingDialogContext != null &&
+                  Navigator.of(
+                    loadingDialogContext!,
+                    rootNavigator: true,
+                  ).canPop()) {
+                Navigator.of(loadingDialogContext!, rootNavigator: true).pop();
+                loadingDialogShown = false;
+                loadingDialogContext = null;
+              }
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('❌ Error: $e'),
@@ -480,167 +831,254 @@ class _DataScreenState extends State<DataScreen>
               );
             }
           },
-          onApprove: canApprove ? () async {
-            Navigator.pop(context);
-            
-            try {
-              final profilingData = data['data'] as ProfilingData;
-              final docId = profilingData.tempIdFirebase;
-              
-              if (docId == null || docId.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('❌ Error: Document ID not found'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              
-              // Show loading dialog
-              if (!mounted) return;
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (dialogContext) {
-                  return AlertDialog(
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 16),
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(DAColors.primaryGreen),
+          onApprove: canApprove
+              ? () async {
+                  bool loadingDialogShown = false;
+                  BuildContext? loadingDialogContext;
+
+                  try {
+                    final profilingData = data['data'] as ProfilingData;
+                    final docId = profilingData.tempIdFirebase;
+
+                    if (docId == null || docId.isEmpty) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('❌ Error: Document ID not found'),
+                          backgroundColor: Colors.red,
                         ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Approving profile...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      );
+                      return;
+                    }
+
+                    final canProceed = await _ensureRequiredIdsBeforeApproval(
+                      profilingData,
+                    );
+                    if (!canProceed) {
+                      return;
+                    }
+
+                    // Show loading dialog
+                    if (!mounted) return;
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      useRootNavigator: true,
+                      builder: (dialogContext) {
+                        loadingDialogContext = dialogContext;
+                        return AlertDialog(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 16),
+                              const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  DAColors.primaryGreen,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              const Text(
+                                'Approving profile...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
+                        );
+                      },
+                    );
+                    loadingDialogShown = true;
+
+                    final approveResult = await _storage.approvePendingProfile(
+                      docId,
+                      profilingData,
+                    );
+                    final bool success = _asSuccess(approveResult);
+
+                    if (!mounted) return;
+                    if (loadingDialogShown &&
+                        loadingDialogContext != null &&
+                        Navigator.of(
+                          loadingDialogContext!,
+                          rootNavigator: true,
+                        ).canPop()) {
+                      Navigator.of(
+                        loadingDialogContext!,
+                        rootNavigator: true,
+                      ).pop();
+                      loadingDialogShown = false;
+                      loadingDialogContext = null;
+                    }
+
+                    if (success) {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Profile approved successfully'),
+                          backgroundColor: DAColors.primaryGreen,
                         ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                  );
-                },
-              );
-              
-              final success = await _storage.approvePendingProfile(docId, profilingData);
-              
-              if (!mounted) return;
-              Navigator.pop(context);
-              
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Profile approved successfully'),
-                    backgroundColor: DAColors.primaryGreen,
-                  ),
-                );
-                // Reload pending and approved data
-                await _loadPendingProfiles();
-                await _loadApprovedProfiles();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('❌ Failed to approve profile'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (!mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('❌ Error: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          } : null,
-          onDecline: canApprove ? () async {
-            Navigator.pop(context);
-            
-            try {
-              final profilingData = data['data'] as ProfilingData;
-              final docId = profilingData.tempIdFirebase;
-              
-              if (docId == null || docId.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('❌ Error: Document ID not found'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              
-              // Show loading dialog
-              if (!mounted) return;
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (dialogContext) {
-                  return AlertDialog(
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 16),
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(DAColors.primaryGreen),
+                      );
+                      // Reload pending and approved data
+                      await _loadPendingProfiles();
+                      await _loadApprovedProfiles();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('❌ Failed to approve profile'),
+                          backgroundColor: Colors.red,
                         ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Declining profile...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      );
+                    }
+                  } catch (e) {
+                    if (!mounted) return;
+                    if (loadingDialogShown &&
+                        loadingDialogContext != null &&
+                        Navigator.of(
+                          loadingDialogContext!,
+                          rootNavigator: true,
+                        ).canPop()) {
+                      Navigator.of(
+                        loadingDialogContext!,
+                        rootNavigator: true,
+                      ).pop();
+                      loadingDialogShown = false;
+                      loadingDialogContext = null;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('❌ Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              : null,
+          onDecline: canApprove
+              ? () async {
+                  bool loadingDialogShown = false;
+                  BuildContext? loadingDialogContext;
+
+                  try {
+                    final profilingData = data['data'] as ProfilingData;
+                    final docId = profilingData.tempIdFirebase;
+
+                    if (docId == null || docId.isEmpty) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('❌ Error: Document ID not found'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Show loading dialog
+                    if (!mounted) return;
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      useRootNavigator: true,
+                      builder: (dialogContext) {
+                        loadingDialogContext = dialogContext;
+                        return AlertDialog(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 16),
+                              const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  DAColors.primaryGreen,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              const Text(
+                                'Declining profile...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
+                        );
+                      },
+                    );
+                    loadingDialogShown = true;
+
+                    final rejectResult = await _storage.rejectPendingProfile(
+                      docId,
+                      'Declined by moderator',
+                    );
+                    final bool success = _asSuccess(rejectResult);
+
+                    if (!mounted) return;
+                    if (loadingDialogShown &&
+                        loadingDialogContext != null &&
+                        Navigator.of(
+                          loadingDialogContext!,
+                          rootNavigator: true,
+                        ).canPop()) {
+                      Navigator.of(
+                        loadingDialogContext!,
+                        rootNavigator: true,
+                      ).pop();
+                      loadingDialogShown = false;
+                      loadingDialogContext = null;
+                    }
+
+                    if (success) {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Profile declined'),
+                          backgroundColor: DAColors.red,
                         ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                  );
-                },
-              );
-              
-              final success = await _storage.rejectPendingProfile(docId, 'Declined by moderator');
-              
-              if (!mounted) return;
-              Navigator.pop(context);
-              
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Profile declined'),
-                    backgroundColor: DAColors.red,
-                  ),
-                );
-                // Reload pending data
-                await _loadPendingProfiles();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('❌ Failed to decline profile'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (!mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('❌ Error: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          } : null,
+                      );
+                      // Reload pending data
+                      await _loadPendingProfiles();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('❌ Failed to decline profile'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (!mounted) return;
+                    if (loadingDialogShown &&
+                        loadingDialogContext != null &&
+                        Navigator.of(
+                          loadingDialogContext!,
+                          rootNavigator: true,
+                        ).canPop()) {
+                      Navigator.of(
+                        loadingDialogContext!,
+                        rootNavigator: true,
+                      ).pop();
+                      loadingDialogShown = false;
+                      loadingDialogContext = null;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('❌ Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              : null,
         ),
       ),
     );
@@ -689,7 +1127,7 @@ class _DataScreenState extends State<DataScreen>
                 ],
               ),
             ),
-          
+
           /// GREEN HEADER SECTION
           SizedBox(
             height: headerHeight,
@@ -808,19 +1246,23 @@ class _DataScreenState extends State<DataScreen>
                       if (!_isOnline) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('📴 You are offline. Connect to internet to view pending profiles.'),
+                            content: Text(
+                              '📴 You are offline. Connect to internet to view pending profiles.',
+                            ),
                             backgroundColor: Colors.orange,
                             duration: Duration(seconds: 2),
                           ),
                         );
                         return;
                       }
-                      
+
                       setState(() {
                         _selectedFilter = 'Pending';
                       });
                       // Lazy-load pending from Firebase only when tab clicked
-                      debugPrint('📱 Pending tab selected - loading from Firebase...');
+                      debugPrint(
+                        '📱 Pending tab selected - loading from Firebase...',
+                      );
                       _loadPendingProfiles();
                     },
                   ),
@@ -833,19 +1275,23 @@ class _DataScreenState extends State<DataScreen>
                       if (!_isOnline) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('📴 You are offline. Connect to internet to view approved profiles.'),
+                            content: Text(
+                              '📴 You are offline. Connect to internet to view approved profiles.',
+                            ),
                             backgroundColor: Colors.orange,
                             duration: Duration(seconds: 2),
                           ),
                         );
                         return;
                       }
-                      
+
                       setState(() {
                         _selectedFilter = 'Approved';
                       });
                       // Lazy-load approved from Firebase only when tab clicked
-                      debugPrint('📱 Approved tab selected - loading from Firebase...');
+                      debugPrint(
+                        '📱 Approved tab selected - loading from Firebase...',
+                      );
                       _loadApprovedProfiles();
                     },
                   ),
@@ -853,6 +1299,27 @@ class _DataScreenState extends State<DataScreen>
               ),
             ),
           ),
+
+          if (_selectedFilter == 'Approved')
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                filterPaddingH,
+                8 * scale,
+                filterPaddingH,
+                0,
+              ),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _downloadApprovedBasicInformation,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Download Basic Info'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: DAColors.primaryGreen,
+                  ),
+                ),
+              ),
+            ),
 
           SizedBox(height: afterFilterSpacing),
 
@@ -876,11 +1343,15 @@ class _DataScreenState extends State<DataScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(DAColors.primaryGreen),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              DAColors.primaryGreen,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            _selectedFilter == 'Pending' ? 'Loading pending profiles...' : 'Loading approved profiles...',
+                            _selectedFilter == 'Pending'
+                                ? 'Loading pending profiles...'
+                                : 'Loading approved profiles...',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -891,17 +1362,17 @@ class _DataScreenState extends State<DataScreen>
                       ),
                     )
                   : _filteredData.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No ${_selectedFilter.toLowerCase()} profiles',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
+                  ? Center(
+                      child: Text(
+                        'No ${_selectedFilter.toLowerCase()} profiles',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
                       padding: EdgeInsets.symmetric(
                         horizontal: listPaddingH,
                         vertical: listPaddingV,
@@ -914,14 +1385,14 @@ class _DataScreenState extends State<DataScreen>
                           child: DataCard(
                             farmerName: data['farmerName'],
                             location: data['location'],
-                      commodity: data['commodity'],
-                      enumerator: data['enumerator'],
-                      date: data['date'],
-                      status: data['status'],
-                      onViewTap: () => _openDataViewModal(data),
-                    ),
-                  );
-                },
+                            commodity: data['commodity'],
+                            enumerator: data['enumerator'],
+                            date: data['date'],
+                            status: data['status'],
+                            onViewTap: () => _openDataViewModal(data),
+                          ),
+                        );
+                      },
                     ),
             ),
           ),

@@ -9,10 +9,10 @@ import 'package:path/path.dart' as p;
 /// Folder Structure:
 /// /SAADProfiling/
 ///   ├─ farmername_lastname_[ID]/
-///   │  ├─ farmername_lastname_frontimage.jpg
-///   │  ├─ farmername_lastname_backimage.jpg
-///   │  ├─ farmername_lastname_profilepicture.jpg
-///   │  ├─ farmername_lastname_signature.png
+///   │  ├─ firstname_id_front.jpg
+///   │  ├─ firstname_id_back.jpg
+///   │  ├─ firstname_profile_pic.jpg
+///   │  ├─ firstname_signature.png
 ///   │  └─ draft.json
 ///   │
 ///   └─ anotherfarmername_[ID]/
@@ -51,59 +51,96 @@ class ImageStorageService {
   /// Generate sanitized folder name for farmer from first and last name
   /// Input: "Juan Dela Cruz"
   /// Output: "juan_dela_cruz_timestamp"
-  String generateFarmerFolderName(String firstName, String lastName, {String? uniqueId}) {
+  String generateFarmerFolderName(
+    String firstName,
+    String lastName, {
+    String? uniqueId,
+  }) {
     final sanitizedFirst = firstName.replaceAll(' ', '_').toLowerCase();
     final sanitizedLast = lastName.replaceAll(' ', '_').toLowerCase();
-    final timestamp = uniqueId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final timestamp =
+        uniqueId ?? DateTime.now().millisecondsSinceEpoch.toString();
     return '${sanitizedFirst}_${sanitizedLast}_$timestamp';
   }
 
   /// Generate sanitized folder name from full name string
   /// Example: "Juan S. Dela Cruz" -> "juan_s_dela_cruz_timestamp"
-  String generateFarmerFolderNameFromFullName(String fullName, {String? uniqueId}) {
+  String generateFarmerFolderNameFromFullName(
+    String fullName, {
+    String? uniqueId,
+  }) {
     final sanitized = fullName
         .replaceAll(RegExp(r'\s+'), '_')
         .replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '')
         .toLowerCase();
-    final timestamp = uniqueId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final timestamp =
+        uniqueId ?? DateTime.now().millisecondsSinceEpoch.toString();
     return '${sanitized}_$timestamp';
   }
 
   /// Save ID Front Image
-  Future<String> saveIdFrontImage(File imageFile, String farmerFolderName,
-      {String? firstName, String? lastName}) async {
-    return _saveImage(imageFile, farmerFolderName, '_frontimage',
-        firstName: firstName, lastName: lastName);
+  Future<String> saveIdFrontImage(
+    File imageFile,
+    String farmerFolderName, {
+    String? firstName,
+    String? lastName,
+  }) async {
+    return _saveImage(
+      imageFile,
+      farmerFolderName,
+      '_id_front',
+      firstName: firstName,
+      lastName: lastName,
+    );
   }
 
   /// Save ID Back Image
-  Future<String> saveIdBackImage(File imageFile, String farmerFolderName,
-      {String? firstName, String? lastName}) async {
-    return _saveImage(imageFile, farmerFolderName, '_backimage',
-        firstName: firstName, lastName: lastName);
+  Future<String> saveIdBackImage(
+    File imageFile,
+    String farmerFolderName, {
+    String? firstName,
+    String? lastName,
+  }) async {
+    return _saveImage(
+      imageFile,
+      farmerFolderName,
+      '_id_back',
+      firstName: firstName,
+      lastName: lastName,
+    );
   }
 
   /// Save Profile Picture
-  Future<String> saveProfilePicture(File imageFile, String farmerFolderName,
-      {String? firstName, String? lastName}) async {
-    return _saveImage(imageFile, farmerFolderName, '_profilepicture',
-        firstName: firstName, lastName: lastName);
+  Future<String> saveProfilePicture(
+    File imageFile,
+    String farmerFolderName, {
+    String? firstName,
+    String? lastName,
+  }) async {
+    return _saveImage(
+      imageFile,
+      farmerFolderName,
+      '_profile_pic',
+      firstName: firstName,
+      lastName: lastName,
+    );
   }
 
   /// Save Signature (as PNG)
-  Future<String> saveSignature(Uint8List imageData, String farmerFolderName,
-      {String? firstName, String? lastName}) async {
+  Future<String> saveSignature(
+    Uint8List imageData,
+    String farmerFolderName, {
+    String? firstName,
+    String? lastName,
+  }) async {
     try {
       final farmerDir = await _getFarmerFolder(farmerFolderName);
 
-      // Build image name from first and last name, or extract from folder
-      String baseName;
-      if ((firstName ?? '').isNotEmpty && (lastName ?? '').isNotEmpty) {
-        baseName =
-            '${firstName!.toLowerCase().replaceAll(' ', '_')}_${lastName!.toLowerCase().replaceAll(' ', '_')}';
-      } else {
-        baseName = _extractBaseName(farmerFolderName);
-      }
+      // Build image name from first name, or extract first name from folder
+      final baseName = _buildImageBaseName(
+        farmerFolderName,
+        firstName: firstName,
+      );
 
       final filePath = '${farmerDir.path}/${baseName}_signature.png';
       final file = File(filePath);
@@ -112,7 +149,9 @@ class ImageStorageService {
 
       // Verify file was successfully saved
       if (!await file.exists()) {
-        throw Exception('Signature file was written but does not exist at: $filePath');
+        throw Exception(
+          'Signature file was written but does not exist at: $filePath',
+        );
       }
 
       final fileSize = await file.length();
@@ -128,25 +167,37 @@ class ImageStorageService {
   }
 
   /// Internal method to save image file
-  Future<String> _saveImage(File imageFile, String farmerFolderName, String suffix,
-      {String? firstName, String? lastName}) async {
+  Future<String> _saveImage(
+    File imageFile,
+    String farmerFolderName,
+    String suffix, {
+    String? firstName,
+    String? lastName,
+  }) async {
     try {
       final farmerDir = await _getFarmerFolder(farmerFolderName);
 
-      // Build image name from first and last name, or extract from folder
-      String baseName;
-      if ((firstName ?? '').isNotEmpty && (lastName ?? '').isNotEmpty) {
-        baseName =
-            '${firstName!.toLowerCase().replaceAll(' ', '_')}_${lastName!.toLowerCase().replaceAll(' ', '_')}';
-      } else {
-        baseName = _extractBaseName(farmerFolderName);
-      }
+      // Build image name from first name, or extract first name from folder
+      final baseName = _buildImageBaseName(
+        farmerFolderName,
+        firstName: firstName,
+      );
 
       // Preserve original file extension if available (avoid renaming HEIC/WEBP to .jpg)
       final originalExt = p.extension(imageFile.path).toLowerCase();
       final ext = (originalExt.isEmpty) ? '.jpg' : originalExt;
       final fileName = '$baseName$suffix$ext';
       final targetPath = '${farmerDir.path}/$fileName';
+
+      // Remove old files for the same image type (handles extension changes on retake)
+      final existing = await farmerDir.list().where((entity) {
+        if (entity is! File) return false;
+        final name = p.basename(entity.path).toLowerCase();
+        return name.startsWith('${baseName.toLowerCase()}$suffix');
+      }).toList();
+      for (final entity in existing) {
+        await (entity as File).delete();
+      }
 
       // Read bytes and write to new file to ensure consistent storage across platforms
       final imageData = await imageFile.readAsBytes();
@@ -183,6 +234,28 @@ class ImageStorageService {
     return farmerFolderName;
   }
 
+  /// Build base image filename prefix using first name only.
+  /// Input examples:
+  ///   firstName="Juan" -> "juan"
+  ///   folder="juan_dela_cruz_12345" -> "juan"
+  String _buildImageBaseName(String farmerFolderName, {String? firstName}) {
+    final providedFirstName = (firstName ?? '').trim();
+    if (providedFirstName.isNotEmpty) {
+      return _sanitizeNameToken(providedFirstName);
+    }
+
+    final baseName = _extractBaseName(farmerFolderName);
+    final firstToken = baseName.split('_').first;
+    return _sanitizeNameToken(firstToken);
+  }
+
+  String _sanitizeNameToken(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '');
+  }
+
   /// Get all farmer folders
   Future<List<String>> getAllFarmerFolders() async {
     try {
@@ -207,16 +280,40 @@ class ImageStorageService {
       final farmerDir = await _getFarmerFolder(farmerFolderName);
       final entities = await farmerDir.list().toList();
 
+      Future<void> setNewest(
+        Map<String, String> target,
+        Map<String, DateTime> targetDates,
+        String key,
+        File file,
+      ) async {
+        final modified = await file.lastModified();
+        final current = targetDates[key];
+        if (current == null || modified.isAfter(current)) {
+          target[key] = file.path;
+          targetDates[key] = modified;
+        }
+      }
+
       final images = <String, String>{};
+      final imageDates = <String, DateTime>{};
       for (final entity in entities) {
         if (entity is File) {
           final fileName = entity.path.split(Platform.pathSeparator).last;
-          if (fileName.contains('_frontimage')) images['front'] = entity.path;
-          if (fileName.contains('_backimage')) images['back'] = entity.path;
-          if (fileName.contains('_profilepicture')) {
-            images['profile'] = entity.path;
+          if (fileName.contains('_id_front') ||
+              fileName.contains('_frontimage')) {
+            await setNewest(images, imageDates, 'front', entity);
           }
-          if (fileName.contains('_signature')) images['signature'] = entity.path;
+          if (fileName.contains('_id_back') ||
+              fileName.contains('_backimage')) {
+            await setNewest(images, imageDates, 'back', entity);
+          }
+          if (fileName.contains('_profile_pic') ||
+              fileName.contains('_profilepicture')) {
+            await setNewest(images, imageDates, 'profile', entity);
+          }
+          if (fileName.contains('_signature')) {
+            await setNewest(images, imageDates, 'signature', entity);
+          }
         }
       }
 
@@ -224,6 +321,91 @@ class ImageStorageService {
     } catch (e) {
       debugPrint('❌ Error getting farmer images: $e');
       return {};
+    }
+  }
+
+  String? _imageKindFromFileName(String fileName) {
+    final normalized = fileName.toLowerCase();
+    if (normalized.contains('_id_front') ||
+        normalized.contains('_frontimage')) {
+      return 'front';
+    }
+    if (normalized.contains('_id_back') || normalized.contains('_backimage')) {
+      return 'back';
+    }
+    if (normalized.contains('_profile_pic') ||
+        normalized.contains('_profilepicture')) {
+      return 'profile';
+    }
+    if (normalized.contains('_signature')) {
+      return 'signature';
+    }
+    return null;
+  }
+
+  /// One-time cleanup for a farmer folder:
+  /// keeps only the newest file for each image kind (front/back/profile/signature)
+  /// and deletes older duplicates.
+  Future<int> cleanupFarmerImageDuplicates(String farmerFolderName) async {
+    try {
+      final farmerDir = await _getFarmerFolder(farmerFolderName);
+      final entities = await farmerDir
+          .list()
+          .where((entity) => entity is File)
+          .cast<File>()
+          .toList();
+
+      final grouped = <String, List<File>>{};
+      for (final file in entities) {
+        final name = p.basename(file.path);
+        final kind = _imageKindFromFileName(name);
+        if (kind == null) continue;
+        grouped.putIfAbsent(kind, () => <File>[]).add(file);
+      }
+
+      int deletedCount = 0;
+      for (final files in grouped.values) {
+        if (files.length <= 1) continue;
+
+        files.sort((a, b) {
+          final aTime = a.lastModifiedSync();
+          final bTime = b.lastModifiedSync();
+          return bTime.compareTo(aTime); // newest first
+        });
+
+        for (final oldFile in files.skip(1)) {
+          try {
+            await oldFile.delete();
+            deletedCount++;
+          } catch (e) {
+            debugPrint(
+              '⚠️ Could not delete duplicate file ${oldFile.path}: $e',
+            );
+          }
+        }
+      }
+
+      return deletedCount;
+    } catch (e) {
+      debugPrint('❌ Error cleaning duplicates for $farmerFolderName: $e');
+      return 0;
+    }
+  }
+
+  /// One-time cleanup for all farmer folders.
+  /// Returns total number of deleted duplicate image files.
+  Future<int> cleanupAllFarmerImageDuplicates() async {
+    int totalDeleted = 0;
+    try {
+      final folders = await getAllFarmerFolders();
+      for (final folder in folders) {
+        totalDeleted += await cleanupFarmerImageDuplicates(folder);
+      }
+      debugPrint('✅ Duplicate image cleanup complete. Deleted: $totalDeleted');
+      return totalDeleted;
+    } catch (e) {
+      debugPrint('❌ Error running global duplicate cleanup: $e');
+      return totalDeleted;
     }
   }
 
@@ -252,7 +434,7 @@ class ImageStorageService {
     try {
       final farmerDir = await _getFarmerFolder(farmerFolderName);
 
-      // Build filename from first and last name (same pattern as _frontimage, _signature, etc)
+      // Build filename from first and last name for profiling JSON (separate from image naming)
       String fileName;
       if ((firstName ?? '').isNotEmpty && (lastName ?? '').isNotEmpty) {
         final sanitizedFirst = firstName!.toLowerCase().replaceAll(' ', '_');
@@ -320,13 +502,13 @@ class ImageStorageService {
 
   /// Save multiple images in parallel using an isolate (non-blocking).
   /// Useful for saving all 4 images (front ID, back ID, profile photo, signature) at once.
-  /// 
+  ///
   /// Params:
   ///   - farmerFolderName: folder where images are stored
   ///   - imagesToSave: map of {imageType -> File} e.g., {'front' -> File(...)}
   ///   - signatureData: optional Uint8List for signature
   ///   - firstName, lastName: for filename generation
-  /// 
+  ///
   /// Returns: map of {imageType -> savedPath}
   Future<Map<String, String>> saveImageBatch({
     required String farmerFolderName,
@@ -337,7 +519,7 @@ class ImageStorageService {
   }) async {
     final basePath = (await getAppDirectory()).path;
     final farmerPath = '$basePath/$farmerFolderName';
-    
+
     // Prepare batch payload
     final batchPayload = _ImageBatchPayload(
       farmerPath: farmerPath,
@@ -346,7 +528,7 @@ class ImageStorageService {
       firstName: firstName,
       lastName: lastName,
     );
-    
+
     // Offload to isolate
     final results = await compute(_saveImageBatchWorker, batchPayload);
     return results;
@@ -372,54 +554,79 @@ class _ImageBatchPayload {
 
 /// Isolate worker: save all images in batch.
 /// Runs in background thread and returns {type -> savedPath} map.
-Future<Map<String, String>> _saveImageBatchWorker(_ImageBatchPayload payload) async {
+Future<Map<String, String>> _saveImageBatchWorker(
+  _ImageBatchPayload payload,
+) async {
   final results = <String, String>{};
-  
+
   // Ensure farmer directory exists
   final farmerDir = Directory(payload.farmerPath);
   if (!farmerDir.existsSync()) {
     farmerDir.createSync(recursive: true);
   }
-  
-  // Extract base name for filenames
-  String baseName;
-  if ((payload.firstName ?? '').isNotEmpty && (payload.lastName ?? '').isNotEmpty) {
-    baseName = 
-        '${payload.firstName!.toLowerCase().replaceAll(' ', '_')}_${payload.lastName!.toLowerCase().replaceAll(' ', '_')}';
-  } else {
-    // Extract from folder name (remove timestamp suffix)
-    final parts = payload.farmerPath.split(Platform.pathSeparator).last.split('_');
-    baseName = parts.length > 1 ? parts.sublist(0, parts.length - 1).join('_') : parts.first;
+
+  // Extract first-name base for filenames
+  String sanitizeToken(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '');
   }
-  
+
+  String baseName;
+  final firstName = (payload.firstName ?? '').trim();
+  if (firstName.isNotEmpty) {
+    baseName = sanitizeToken(firstName);
+  } else {
+    final folderName = payload.farmerPath.split(Platform.pathSeparator).last;
+    final parts = folderName.split('_');
+    final extracted = parts.isNotEmpty ? parts.first : 'farmer';
+    baseName = sanitizeToken(extracted);
+  }
+
   // Save regular image files
   for (final entry in payload.imagesToSave.entries) {
+    final imageType = entry.key; // 'front', 'back', 'profile'
     try {
       final imageFile = entry.value;
-      final imageType = entry.key; // 'front', 'back', 'profile'
-      
-      if (!imageFile.existsSync()) continue;
-      
+
+      if (!imageFile.existsSync()) {
+        debugPrint('⚠️ Image file does not exist: ${imageFile.path}');
+        continue;
+      }
+
       final bytes = imageFile.readAsBytesSync();
-      if (bytes.isEmpty) continue;
-      
+      if (bytes.isEmpty) {
+        debugPrint('⚠️ Image file is empty: ${imageFile.path}');
+        continue;
+      }
+
       final ext = p.extension(imageFile.path).toLowerCase();
-      final suffix = imageType == 'front' 
-          ? '_frontimage' 
-          : imageType == 'back' 
-            ? '_backimage' 
-            : '_profilepicture';
+      final suffix = imageType == 'front'
+          ? '_id_front'
+          : imageType == 'back'
+          ? '_id_back'
+          : '_profile_pic';
       final fileName = '$baseName$suffix${ext.isEmpty ? '.jpg' : ext}';
       final targetPath = '${payload.farmerPath}/$fileName';
-      
+
+      // Remove old files for this image type so retakes are deterministic
+      final existing = farmerDir.listSync().whereType<File>().where((file) {
+        final name = p.basename(file.path).toLowerCase();
+        return name.startsWith('${baseName.toLowerCase()}$suffix');
+      }).toList();
+      for (final oldFile in existing) {
+        oldFile.deleteSync();
+      }
+
       File(targetPath).writeAsBytesSync(bytes);
       results[imageType] = targetPath;
-    } catch (_) {
-      // silently skip failed individual images
-      continue;
+      debugPrint('✅ $imageType saved to: $targetPath');
+    } catch (e) {
+      debugPrint('❌ Error saving $imageType: $e');
     }
   }
-  
+
   // Save signature if provided
   if (payload.signatureData != null && payload.signatureData!.isNotEmpty) {
     try {
@@ -427,10 +634,11 @@ Future<Map<String, String>> _saveImageBatchWorker(_ImageBatchPayload payload) as
       final targetPath = '${payload.farmerPath}/$fileName';
       File(targetPath).writeAsBytesSync(payload.signatureData!);
       results['signature'] = targetPath;
-    } catch (_) {
-      // silently skip signature if it fails
+      debugPrint('✅ Signature saved to: $targetPath');
+    } catch (e) {
+      debugPrint('❌ Error saving signature: $e');
     }
   }
-  
+
   return results;
 }

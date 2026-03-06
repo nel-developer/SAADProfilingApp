@@ -320,34 +320,41 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
         ),
       );
 
-      final success = await _storage.approvePendingProfile(docId, profile);
+      final result = await _storage.approvePendingProfile(docId, profile);
       
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
       
-      if (success) {
+      if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('✅ Profile approved successfully'),
             backgroundColor: DAColors.primaryGreen,
+            duration: const Duration(seconds: 3),
           ),
         );
         await _loadPendingProfiles();
       } else {
+        final errorMsg = result.errorMessage ?? 'Unknown approval error';
+        debugPrint('❌ Approval failed: $errorMsg (code: ${result.errorCode})');
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Failed to approve profile'),
+          SnackBar(
+            content: Text('❌ Approval failed: $errorMsg'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
+      debugPrint('❌ Unexpected error approving profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error approving profile: $e'),
+          content: Text('❌ Error: ${e.toString()}'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -379,34 +386,41 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
         ),
       );
 
-      final success = await _storage.rejectPendingProfile(docId, reason);
+      final result = await _storage.rejectPendingProfile(docId, reason);
       
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
       
-      if (success) {
+      if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Profile rejected'),
+          SnackBar(
+            content: const Text('✅ Profile rejected'),
             backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
           ),
         );
         await _loadPendingProfiles();
       } else {
+        final errorMsg = result.errorMessage ?? 'Unknown rejection error';
+        debugPrint('❌ Rejection failed: $errorMsg (code: ${result.errorCode})');
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Failed to reject profile'),
+          SnackBar(
+            content: Text('❌ Rejection failed: $errorMsg'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
+      debugPrint('❌ Unexpected error rejecting profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error rejecting profile: $e'),
+          content: Text('❌ Error: ${e.toString()}'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         ),
       );
     }

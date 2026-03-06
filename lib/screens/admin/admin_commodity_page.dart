@@ -95,24 +95,30 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
   }
 
   double _scale(BuildContext context) {
-    final scaleW =
-        (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
-    final scaleH =
-        (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
+      0.5,
+      2.0,
+    );
+    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(
+      0.5,
+      2.0,
+    );
     return min(scaleW, scaleH);
   }
 
   void _openAddEditModal(CommodityData? editData) {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
-      builder: (context) => _CommodityEditModal(
+      builder: (dialogContext) => _CommodityEditModal(
         commodityService: _commodityService,
         commodityData: editData,
         onSave: (data) async {
           try {
             if (editData == null) {
               await _commodityService.addCommodity(data);
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 const SnackBar(
                   content: Text('✅ Commodity added successfully'),
                   backgroundColor: DAColors.primaryGreen,
@@ -120,7 +126,7 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
               );
             } else {
               await _commodityService.updateCommodity(data.id!, data);
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 const SnackBar(
                   content: Text('✅ Commodity updated successfully'),
                   backgroundColor: DAColors.primaryGreen,
@@ -128,11 +134,11 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
               );
             }
             if (mounted) {
-              Navigator.pop(context);
+              navigator.pop();
               await _loadCommodities();
             }
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(
                 content: Text('❌ Error: $e'),
                 backgroundColor: Colors.red,
@@ -145,14 +151,16 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
   }
 
   void _deleteCommodity(CommodityData data) {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Commodity?'),
         content: Text('Are you sure you want to delete "${data.productForm}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
@@ -160,8 +168,8 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
               try {
                 await _commodityService.deleteCommodity(data.id!);
                 if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  navigator.pop();
+                  messenger.showSnackBar(
                     const SnackBar(
                       content: Text('✅ Commodity deleted'),
                       backgroundColor: DAColors.primaryGreen,
@@ -171,8 +179,8 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
                 }
               } catch (e) {
                 if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  navigator.pop();
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text('❌ Error: $e'),
                       backgroundColor: Colors.red,
@@ -275,38 +283,44 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(DAColors.primaryGreen),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        DAColors.primaryGreen,
+                      ),
                     ),
                   )
                 : _commodities.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No commodities yet',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.inbox_outlined,
+                          size: 64,
+                          color: Colors.grey,
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadCommodities,
-                        color: DAColors.primaryGreen,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _commodities.length,
-                          itemBuilder: (context, index) {
-                            final commodity = _commodities[index];
-                            return _buildCommodityCard(commodity, scale);
-                          },
+                        const SizedBox(height: 16),
+                        Text(
+                          'No commodities yet',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadCommodities,
+                    color: DAColors.primaryGreen,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _commodities.length,
+                      itemBuilder: (context, index) {
+                        final commodity = _commodities[index];
+                        return _buildCommodityCard(commodity, scale);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -380,11 +394,16 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
             Wrap(
               spacing: 8,
               children: [
-                if (commodity.maleRequired == true) _buildTag('Male', Colors.blue),
-                if (commodity.femaleRequired == true) _buildTag('Female', Colors.pink),
-                if (commodity.totalWeightRequired == true) _buildTag('Weight', Colors.orange),
-                if (commodity.totalPriceRequired == true) _buildTag('Price', Colors.green),
-                if (commodity.expensesRequired == true) _buildTag('Expenses', Colors.red),
+                if (commodity.maleRequired == true)
+                  _buildTag('Male', Colors.blue),
+                if (commodity.femaleRequired == true)
+                  _buildTag('Female', Colors.pink),
+                if (commodity.totalWeightRequired == true)
+                  _buildTag('Weight', Colors.orange),
+                if (commodity.totalPriceRequired == true)
+                  _buildTag('Price', Colors.green),
+                if (commodity.expensesRequired == true)
+                  _buildTag('Expenses', Colors.red),
               ],
             ),
             if ((commodity.remarks ?? '').isNotEmpty) ...[
@@ -396,7 +415,7 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
                   color: Colors.grey.shade700,
                 ),
               ),
-            ]
+            ],
           ],
         ),
       ),
@@ -448,12 +467,22 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   final _commodityTextController = TextEditingController();
   final _saleMethodTextController = TextEditingController();
   final _productFormTextController = TextEditingController();
+  static const String _customOption = '__custom__';
+  bool _isCustomType = false;
+  bool _isCustomCommodity = false;
   String? _selectedType;
   String? _selectedCommodity;
   String? _selectedSaleMethod;
   String? _selectedProductForm;
-  
-  final List<String> _typeOptions = ['Livestock', 'Poultry', 'HVC', 'Corn', 'Rice', 'Others'];
+
+  final List<String> _typeOptions = [
+    'Livestock',
+    'Poultry',
+    'HVC',
+    'Corn',
+    'Rice',
+    'Others',
+  ];
   List<String> _commodityOptions = [];
   List<String> _saleMethodOptions = [];
   List<String> _productFormOptions = [];
@@ -474,7 +503,16 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
     _commodityTextController.text = _data.commodity ?? '';
     _saleMethodTextController.text = _data.saleMeth ?? '';
     _productFormTextController.text = _data.productForm ?? '';
-    
+
+    _isCustomType =
+        widget.commodityData == null &&
+        _selectedType != null &&
+        !_typeOptions.contains(_selectedType);
+    _isCustomCommodity =
+        widget.commodityData == null && _selectedCommodity != null;
+
+    _loadTypeOptions();
+
     // Load initial filtered options
     if (_selectedType != null) {
       _loadCommodityOptions(_selectedType!);
@@ -482,8 +520,36 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
     if (_selectedType != null && _selectedCommodity != null) {
       _loadSaleMethodOptions(_selectedType!, _selectedCommodity!);
     }
-    if (_selectedType != null && _selectedCommodity != null && _selectedSaleMethod != null) {
-      _loadProductFormOptions(_selectedType!, _selectedCommodity!, _selectedSaleMethod!);
+    if (_selectedType != null &&
+        _selectedCommodity != null &&
+        _selectedSaleMethod != null) {
+      _loadProductFormOptions(
+        _selectedType!,
+        _selectedCommodity!,
+        _selectedSaleMethod!,
+      );
+    }
+  }
+
+  Future<void> _loadTypeOptions() async {
+    try {
+      final commodities = await widget.commodityService.getAllCommodities();
+      final dynamicTypes =
+          commodities
+              .map((c) => c.type ?? '')
+              .where((t) => t.trim().isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final merged = {..._typeOptions, ...dynamicTypes}.toList()..sort();
+      if (!mounted) return;
+      setState(() {
+        _typeOptions
+          ..clear()
+          ..addAll(merged);
+      });
+    } catch (e) {
+      debugPrint('❌ Error loading commodity type options: $e');
     }
   }
 
@@ -521,11 +587,20 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
     }
   }
 
-  Future<void> _loadProductFormOptions(String type, String commodity, String saleMethod) async {
+  Future<void> _loadProductFormOptions(
+    String type,
+    String commodity,
+    String saleMethod,
+  ) async {
     try {
       final commodities = await widget.commodityService.getAllCommodities();
       final options = commodities
-          .where((c) => c.type == type && c.commodity == commodity && c.saleMeth == saleMethod)
+          .where(
+            (c) =>
+                c.type == type &&
+                c.commodity == commodity &&
+                c.saleMeth == saleMethod,
+          )
           .map((c) => c.productForm ?? '')
           .where((p) => p.isNotEmpty)
           .toSet()
@@ -553,18 +628,28 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.commodityData == null ? 'Add Commodity' : 'Edit Commodity'),
+      title: Text(
+        widget.commodityData == null ? 'Add Commodity' : 'Edit Commodity',
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (widget.commodityData == null) ...[
-              // Add mode - allow typing new master records
-              _buildTextField('Commodity Type', _typeTextController, 'Livestock, Poultry, HVC, etc.'),
-              _buildTextField('Commodity', _commodityTextController, 'Swine, Cattle, Goat, Carabao, etc.'),
-              _buildTextField('Sale Method', _saleMethodTextController, 'Live Animal, Meat Retail, etc.'),
-              _buildTextField('Product Form', _productFormTextController, 'Weaner, Pork Cuts, Whole Animal, etc.'),
+              // Add mode - dropdown with optional custom input
+              _buildFlexibleTypeField(),
+              _buildFlexibleCommodityField(),
+              _buildTextField(
+                'Sale Method',
+                _saleMethodTextController,
+                'Live Animal, Meat Retail, etc.',
+              ),
+              _buildTextField(
+                'Product Form',
+                _productFormTextController,
+                'Weaner, Pork Cuts, Whole Animal, etc.',
+              ),
               const SizedBox(height: 12),
             ] else ...[
               // Edit mode - use cascading dropdowns from existing records
@@ -578,14 +663,24 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
                 _buildSaleMethodDropdown(),
                 const SizedBox(height: 12),
               ],
-              if (_selectedType != null && _selectedCommodity != null && _selectedSaleMethod != null) ...[
+              if (_selectedType != null &&
+                  _selectedCommodity != null &&
+                  _selectedSaleMethod != null) ...[
                 _buildProductFormDropdown(),
                 const SizedBox(height: 12),
               ],
             ],
-            
-            _buildTextField('Pricing Basis', _pricingBasisController, 'Per Head, Per Kilogram, etc.'),
-            _buildTextField('Unit', _unitController, 'Head, Kilograms, Liters, etc.'),
+
+            _buildTextField(
+              'Pricing Basis',
+              _pricingBasisController,
+              'Per Head, Per Kilogram, etc.',
+            ),
+            _buildTextField(
+              'Unit',
+              _unitController,
+              'Head, Kilograms, Liters, etc.',
+            ),
             _buildTextField('Remarks', _remarksController, 'Optional notes'),
             const SizedBox(height: 16),
             Text(
@@ -600,18 +695,32 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
             _buildCheckbox('Male Required', _data.maleRequired ?? false, (val) {
               setState(() => _data.maleRequired = val);
             }),
-            _buildCheckbox('Female Required', _data.femaleRequired ?? false, (val) {
+            _buildCheckbox('Female Required', _data.femaleRequired ?? false, (
+              val,
+            ) {
               setState(() => _data.femaleRequired = val);
             }),
-            _buildCheckbox('Total Weight Required', _data.totalWeightRequired ?? false, (val) {
-              setState(() => _data.totalWeightRequired = val);
-            }),
-            _buildCheckbox('Total Price Required', _data.totalPriceRequired ?? false, (val) {
-              setState(() => _data.totalPriceRequired = val);
-            }),
-            _buildCheckbox('Expenses Required', _data.expensesRequired ?? false, (val) {
-              setState(() => _data.expensesRequired = val);
-            }),
+            _buildCheckbox(
+              'Total Weight Required',
+              _data.totalWeightRequired ?? false,
+              (val) {
+                setState(() => _data.totalWeightRequired = val);
+              },
+            ),
+            _buildCheckbox(
+              'Total Price Required',
+              _data.totalPriceRequired ?? false,
+              (val) {
+                setState(() => _data.totalPriceRequired = val);
+              },
+            ),
+            _buildCheckbox(
+              'Expenses Required',
+              _data.expensesRequired ?? false,
+              (val) {
+                setState(() => _data.expensesRequired = val);
+              },
+            ),
           ],
         ),
       ),
@@ -624,9 +733,13 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           onPressed: () {
             // Support both Add (typing new record) and Edit (selecting existing)
             if (widget.commodityData == null) {
-              // Add-mode: read from text controllers
-              _data.type = _typeTextController.text.trim();
-              _data.commodity = _commodityTextController.text.trim();
+              // Add-mode: read from dropdown or custom input
+              _data.type = _isCustomType
+                  ? _typeTextController.text.trim()
+                  : (_selectedType ?? '').trim();
+              _data.commodity = _isCustomCommodity
+                  ? _commodityTextController.text.trim()
+                  : (_selectedCommodity ?? '').trim();
               _data.saleMeth = _saleMethodTextController.text.trim();
               _data.productForm = _productFormTextController.text.trim();
             } else {
@@ -680,13 +793,23 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, String hint) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    String hint,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
           TextField(
             controller: controller,
@@ -695,7 +818,10 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
             ),
           ),
         ],
@@ -709,15 +835,18 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Commodity Type', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            'Commodity Type',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            value: _selectedType,
+            initialValue: _selectedType,
             items: _typeOptions
-                .map((type) => DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    ))
+                .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                 .toList(),
             onChanged: (value) {
               setState(() {
@@ -737,10 +866,146 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
               hintText: 'Select commodity type',
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFlexibleTypeField() {
+    final items = [..._typeOptions, 'Add New Type...'];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Commodity Type',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<String>(
+            initialValue: _isCustomType ? _customOption : _selectedType,
+            items: [
+              ...items.map(
+                (type) => DropdownMenuItem(
+                  value: type == 'Add New Type...' ? _customOption : type,
+                  child: Text(type),
+                ),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                if (value == _customOption) {
+                  _isCustomType = true;
+                  _selectedType = null;
+                } else {
+                  _isCustomType = false;
+                  _selectedType = value;
+                }
+                _selectedCommodity = null;
+                _isCustomCommodity = false;
+                _commodityTextController.clear();
+                _commodityOptions = [];
+              });
+              if (!_isCustomType && _selectedType != null) {
+                _loadCommodityOptions(_selectedType!);
+              }
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              hintText: 'Select commodity type',
+            ),
+          ),
+          if (_isCustomType) ...[
+            const SizedBox(height: 8),
+            _buildTextField(
+              'New Commodity Type',
+              _typeTextController,
+              'Livestock, Poultry, HVC, etc.',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFlexibleCommodityField() {
+    final commodityItems = [..._commodityOptions, 'Add New Commodity...'];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Commodity',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<String>(
+            initialValue: _isCustomCommodity
+                ? _customOption
+                : _selectedCommodity,
+            items: [
+              ...commodityItems.map(
+                (commodity) => DropdownMenuItem(
+                  value: commodity == 'Add New Commodity...'
+                      ? _customOption
+                      : commodity,
+                  child: Text(commodity),
+                ),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                if (value == _customOption) {
+                  _isCustomCommodity = true;
+                  _selectedCommodity = null;
+                } else {
+                  _isCustomCommodity = false;
+                  _selectedCommodity = value;
+                }
+              });
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              hintText: 'Select commodity',
+            ),
+          ),
+          if (_isCustomCommodity) ...[
+            const SizedBox(height: 8),
+            _buildTextField(
+              'New Commodity',
+              _commodityTextController,
+              'Swine, Cattle, Goat, Carabao, etc.',
+            ),
+          ],
         ],
       ),
     );
@@ -752,15 +1017,23 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Commodity', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            'Commodity',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            value: _selectedCommodity,
+            initialValue: _selectedCommodity,
             items: _commodityOptions
-                .map((commodity) => DropdownMenuItem(
-                      value: commodity,
-                      child: Text(commodity),
-                    ))
+                .map(
+                  (commodity) => DropdownMenuItem(
+                    value: commodity,
+                    child: Text(commodity),
+                  ),
+                )
                 .toList(),
             onChanged: (value) {
               setState(() {
@@ -778,7 +1051,10 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
               hintText: 'Select commodity',
             ),
           ),
@@ -801,15 +1077,21 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Sale Method', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            'Sale Method',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            value: _selectedSaleMethod,
+            initialValue: _selectedSaleMethod,
             items: _saleMethodOptions
-                .map((method) => DropdownMenuItem(
-                      value: method,
-                      child: Text(method),
-                    ))
+                .map(
+                  (method) =>
+                      DropdownMenuItem(value: method, child: Text(method)),
+                )
                 .toList(),
             onChanged: (value) {
               setState(() {
@@ -817,15 +1099,24 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
                 _selectedProductForm = null;
                 _productFormOptions = [];
               });
-              if (value != null && _selectedType != null && _selectedCommodity != null) {
-                _loadProductFormOptions(_selectedType!, _selectedCommodity!, value);
+              if (value != null &&
+                  _selectedType != null &&
+                  _selectedCommodity != null) {
+                _loadProductFormOptions(
+                  _selectedType!,
+                  _selectedCommodity!,
+                  value,
+                );
               }
             },
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
               hintText: 'Select sale method',
             ),
           ),
@@ -848,15 +1139,18 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Product Form', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            'Product Form',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            value: _selectedProductForm,
+            initialValue: _selectedProductForm,
             items: _productFormOptions
-                .map((form) => DropdownMenuItem(
-                      value: form,
-                      child: Text(form),
-                    ))
+                .map((form) => DropdownMenuItem(value: form, child: Text(form)))
                 .toList(),
             onChanged: (value) {
               setState(() => _selectedProductForm = value);
@@ -865,7 +1159,10 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
               hintText: 'Select product form',
             ),
           ),

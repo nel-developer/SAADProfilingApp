@@ -55,30 +55,40 @@ class _DataViewModalState extends State<DataViewModal> {
   List<int> _getRelevantYears() {
     final profileData = _getProfileData();
     if (profileData == null) return [];
-    
+
+    final years = <int>{};
+
+    try {
+      final byYear = profileData.recurrenceByYear;
+      if (byYear is Map) {
+        for (final key in byYear.keys) {
+          final parsed = int.tryParse(key.toString().trim());
+          if (parsed != null) {
+            years.add(parsed);
+          }
+        }
+      }
+    } catch (_) {}
+
     // Get the year from yearCovered field
     final yearCovered = profileData.yearCovered;
-    if (yearCovered == null) {
-      // Fallback to current year if not set
-      return [DateTime.now().year];
-    }
-    
     try {
-      // Handle both string and int types
       if (yearCovered is int) {
-        return [yearCovered];
-      } else if (yearCovered is String) {
-        if (yearCovered.isEmpty) {
-          return [DateTime.now().year];
-        }
-        final year = int.parse(yearCovered);
-        return [year];
+        years.add(yearCovered);
+      } else if (yearCovered is String && yearCovered.trim().isNotEmpty) {
+        final year = int.tryParse(yearCovered.trim());
+        if (year != null) years.add(year);
       }
-      return [DateTime.now().year];
     } catch (e) {
       debugPrint('⚠️ Error parsing year: $e');
+    }
+
+    if (years.isEmpty) {
       return [DateTime.now().year];
     }
+
+    final sorted = years.toList()..sort((a, b) => b.compareTo(a));
+    return sorted;
   }
 
   void _toggleYear(int year) {
@@ -88,10 +98,13 @@ class _DataViewModalState extends State<DataViewModal> {
   }
 
   double _scale(BuildContext context) {
-    final scaleW =
-        (MediaQuery.of(context).size.width / DataViewModal._refWidth).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / DataViewModal._refWidth)
+        .clamp(0.5, 2.0);
     final scaleH =
-        (MediaQuery.of(context).size.height / DataViewModal._refHeight).clamp(0.5, 2.0);
+        (MediaQuery.of(context).size.height / DataViewModal._refHeight).clamp(
+          0.5,
+          2.0,
+        );
     return min(scaleW, scaleH);
   }
 
@@ -117,6 +130,7 @@ class _DataViewModalState extends State<DataViewModal> {
   @override
   Widget build(BuildContext context) {
     final scale = _scale(context);
+    final profileData = _getProfileData();
 
     final titleFontSize = 20.0 * scale;
     final sectionTitleFontSize = 16.0 * scale;
@@ -214,10 +228,7 @@ class _DataViewModalState extends State<DataViewModal> {
                       ),
                     ),
                     SizedBox(height: 4 * scale),
-                    Container(
-                      height: 2 * scale,
-                      color: Colors.grey.shade300,
-                    ),
+                    Container(height: 2 * scale, color: Colors.grey.shade300),
                     SizedBox(height: 20 * scale),
                     _buildInfoRow(
                       'Surname:',
@@ -239,9 +250,9 @@ class _DataViewModalState extends State<DataViewModal> {
                     ),
                     _buildInfoRow(
                       'Sex:',
-                      _getProfileData()?.sex ?? 'N/A',
+                      profileData?.sex ?? 'N/A',
                       'Date of Birth:',
-                      _getProfileData()?.dateOfBirth ?? 'N/A',
+                      profileData?.dateOfBirth ?? 'N/A',
                       labelFontSize,
                       valueFontSize,
                       scale,
@@ -249,14 +260,19 @@ class _DataViewModalState extends State<DataViewModal> {
 
                     SizedBox(height: 16 * scale),
                     SizedBox(height: 12 * scale),
-                    if ((_getProfileData()?.approverEmail ?? '').toString().isNotEmpty)
+                    if ((_getProfileData()?.approverEmail ?? '')
+                        .toString()
+                        .isNotEmpty)
                       Align(
                         alignment: Alignment.bottomRight,
                         child: Padding(
                           padding: EdgeInsets.only(bottom: 4 * scale),
                           child: Text(
                             'Approved by: ${_getProfileData()?.approverEmail}${_getProfileData()?.approvedAt != null ? ' on ${_getProfileData()!.approvedAt!.toString().split(' ')[0]}' : ''}',
-                            style: GoogleFonts.poppins(fontSize: 11 * scale, color: Colors.grey.shade600),
+                            style: GoogleFonts.poppins(
+                              fontSize: 11 * scale,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                         ),
                       ),
@@ -322,72 +338,18 @@ class _DataViewModalState extends State<DataViewModal> {
                     ),
 
                     SizedBox(height: 16 * scale),
-                    _buildSectionTitle('Main Commodity', sectionTitleFontSize, scale),
-                    _buildInfoRow(
-                      'Primary Commodity:',
-                      _getProfileData()?.primaryCommodity ?? 'N/A',
-                      'Secondary Commodity:',
-                      _getProfileData()?.secondaryCommodity ?? 'N/A',
-                      labelFontSize,
-                      valueFontSize,
-                      scale,
-                    ),
-                    // Show "If Other, please specify" only when an "others" value exists
-                    if ((_getProfileData()?.primaryCommodityOthers ?? '').toString().isNotEmpty)
-                      _buildSingleRow(
-                        'If Primary is Other, specify:',
-                        _getProfileData()?.primaryCommodityOthers ?? '___________',
-                        labelFontSize,
-                        valueFontSize,
-                        scale,
-                      ),
-                    if ((_getProfileData()?.secondaryCommodityOthers ?? '').toString().isNotEmpty)
-                      _buildSingleRow(
-                        'If Secondary is Other, specify:',
-                        _getProfileData()?.secondaryCommodityOthers ?? '___________',
-                        labelFontSize,
-                        valueFontSize,
-                        scale,
-                      ),
-
-                    SizedBox(height: 16 * scale),
                     _buildSectionTitle(
-                      'Farmers/Fishers Cooperative',
+                      'Recurrence',
                       sectionTitleFontSize,
                       scale,
                     ),
-                    _buildInfoRow(
-                      'Organization Name:',
-                      _getProfileData()?.cooperativeName ?? 'N/A',
-                      'Position:',
-                      _getProfileData()?.cooperativePosition ?? 'N/A',
-                      labelFontSize,
-                      valueFontSize,
-                      scale,
-                    ),
-                    _buildInfoRow(
-                      'Date of Membership:',
-                      _getProfileData()?.dateOfMembership ?? 'N/A',
-                      'If Other Position, specify:',
-                      _getProfileData()?.cooperativePositionOthers ?? '___________',
-                      labelFontSize,
-                      valueFontSize,
-                      scale,
-                    ),
-
-                    SizedBox(height: 16 * scale),
-                    _buildSectionTitle('Recurrence', sectionTitleFontSize, scale),
                     // DYNAMIC YEAR DROPDOWNS (last 3 years + current year, descending)
                     // NOW INCLUDES MONTHLY INCOME INSIDE EACH YEAR
-                    ..._buildRecurrenceYearsList(labelFontSize, valueFontSize, scale),
-
-                    SizedBox(height: 16 * scale),
-                    _buildSectionTitle(
-                      'Farm/Fisheries Income',
-                      sectionTitleFontSize,
+                    ..._buildRecurrenceYearsList(
+                      labelFontSize,
+                      valueFontSize,
                       scale,
                     ),
-                    _buildFarmIncomeMultiline(labelFontSize, valueFontSize, scale),
                   ],
                 ),
               ),
@@ -396,10 +358,23 @@ class _DataViewModalState extends State<DataViewModal> {
 
           /// BOTTOM BUTTONS
           if (_shouldShowButtons())
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.all(bottomPadding),
-              child: _buildBottomButtons(context, buttonHeight, buttonFontSize, buttonSpacing),
+            SafeArea(
+              top: false,
+              child: Container(
+                color: Colors.white,
+                padding: EdgeInsets.fromLTRB(
+                  bottomPadding,
+                  bottomPadding,
+                  bottomPadding,
+                  bottomPadding,
+                ),
+                child: _buildBottomButtons(
+                  context,
+                  buttonHeight,
+                  buttonFontSize,
+                  buttonSpacing,
+                ),
+              ),
             ),
         ],
       ),
@@ -407,15 +382,20 @@ class _DataViewModalState extends State<DataViewModal> {
   }
 
   bool _shouldShowButtons() {
-    return widget.dataStatus == 'Unsync' || 
-           widget.dataStatus == 'Pending' || 
-           widget.dataStatus == 'Approved';
+    return widget.dataStatus == 'Unsync' ||
+        widget.dataStatus == 'Pending' ||
+        widget.dataStatus == 'Approved';
   }
 
   // Build the list of recurrence year dropdowns (descending order)
-  List<Widget> _buildRecurrenceYearsList(double labelSize, double valueSize, double scale) {
-    final years = _getRelevantYears()..sort((a, b) => b.compareTo(a)); // descending
-    
+  List<Widget> _buildRecurrenceYearsList(
+    double labelSize,
+    double valueSize,
+    double scale,
+  ) {
+    final years = _getRelevantYears()
+      ..sort((a, b) => b.compareTo(a)); // descending
+
     return years.map((year) {
       final isExpanded = _expandedYears[year] ?? false;
       return GestureDetector(
@@ -554,9 +534,148 @@ class _DataViewModalState extends State<DataViewModal> {
     );
   }
 
-  Widget _buildRecurrenceYear(String year, double labelSize, double valueSize, double scale, {bool isExpanded = false}) {
+  Widget _buildRecurrenceYear(
+    String year,
+    double labelSize,
+    double valueSize,
+    double scale, {
+    bool isExpanded = false,
+  }) {
     final profileData = _getProfileData();
-    
+    Map<String, dynamic> yearData = {};
+    try {
+      final byYear = profileData?.recurrenceByYear;
+      if (byYear is Map && byYear[year] is Map) {
+        yearData = Map<String, dynamic>.from(byYear[year]);
+      }
+    } catch (_) {}
+
+    String scopedText(String key, String fallback) {
+      final value = yearData[key];
+      final text = value?.toString().trim();
+      if (text != null && text.isNotEmpty) {
+        return text;
+      }
+      return fallback;
+    }
+
+    String scopedFromKeys(List<String> keys, String fallback) {
+      for (final key in keys) {
+        final value = yearData[key];
+        final text = value?.toString().trim();
+        if (text != null && text.isNotEmpty) {
+          return text;
+        }
+      }
+      return fallback;
+    }
+
+    dynamic scopedValueFromKeys(List<String> keys, dynamic fallback) {
+      for (final key in keys) {
+        final value = yearData[key];
+        if (value == null) continue;
+        final text = value.toString().trim();
+        if (text.isNotEmpty) {
+          return value;
+        }
+      }
+      return fallback;
+    }
+
+    final maleFamily = scopedText(
+      'maleFamilyMembers',
+      '${profileData?.numberOfMalesInFamily ?? 0}',
+    );
+    final femaleFamily = scopedText(
+      'femaleFamilyMembers',
+      '${profileData?.numberOfFemalesInFamily ?? 0}',
+    );
+    final landTenureship = scopedText(
+      'landTenureship',
+      profileData?.landTenureship ?? 'N/A',
+    );
+    final landTenureshipOthers = scopedText(
+      'landTenureshipOthers',
+      profileData?.landTenureshipOthers ?? '___________',
+    );
+    final yearsInFarming = scopedText(
+      'yearsInFarming',
+      '${profileData?.yearsInFarming ?? 0}',
+    );
+    final receivedPrimaryCommodity = scopedFromKeys(
+      ['receivedPrimaryCommodity', 'receivedCommodity', 'primaryCommodity'],
+      (profileData?.receivedPrimaryCommodity ??
+              profileData?.receivedCommodity ??
+              profileData?.primaryCommodity ??
+              'N/A')
+          .toString(),
+    );
+    final receivedSecondaryCommodity = scopedFromKeys(
+      ['receivedSecondaryCommodity', 'secondaryCommodity'],
+      (profileData?.receivedSecondaryCommodity ??
+              profileData?.secondaryCommodity ??
+              'N/A')
+          .toString(),
+    );
+    final primaryCommodity = scopedFromKeys([
+      'primaryCommodity',
+    ], (profileData?.primaryCommodity ?? 'N/A').toString());
+    final secondaryCommodity = scopedFromKeys([
+      'secondaryCommodity',
+    ], (profileData?.secondaryCommodity ?? 'N/A').toString());
+    final beneficiaryIncome = scopedFromKeys([
+      'beneficiaryNonFarmIncome',
+    ], (profileData?.beneficiaryNonFarmIncome ?? '___________').toString());
+    final beneficiaryRemarks = scopedFromKeys([
+      'beneficiaryRemarks',
+    ], (profileData?.beneficiaryRemarks ?? 'N/A').toString());
+    final spouseIncome = scopedFromKeys([
+      'spouseNonFarmIncome',
+    ], (profileData?.spouseNonFarmIncome ?? '___________').toString());
+    final spouseRemarks = scopedFromKeys([
+      'spouseRemarks',
+    ], (profileData?.spouseRemarks ?? 'N/A').toString());
+    final otherMembersIncome = scopedFromKeys([
+      'otherMembersNonFarmIncome',
+    ], (profileData?.otherMembersNonFarmIncome ?? '___________').toString());
+    final otherMembersRemarks = scopedFromKeys([
+      'otherMembersRemarks',
+    ], (profileData?.otherMembersRemarks ?? 'N/A').toString());
+    final nonSaadNetIncome = _resolveNonSaadNetIncome(profileData);
+    final agriRelatedIncome = scopedValueFromKeys([
+      'agriRelatedIncome',
+    ], profileData?.agriRelatedIncome);
+    final saadNetIncome = scopedValueFromKeys([
+      'saadNetIncome',
+    ], profileData?.saadNetIncome);
+    final nonSaadNetIncomeScoped = scopedValueFromKeys([
+      'nonSAADNetIncome',
+    ], nonSaadNetIncome);
+    final nonAgriRelatedIncome = scopedValueFromKeys([
+      'nonAgriRelatedIncome',
+    ], profileData?.nonAgriRelatedIncome);
+    final mainSourcesOfIncome = scopedFromKeys([
+      'mainSourcesOfIncome',
+    ], profileData?.mainSourcesOfIncome ?? 'N/A');
+    final cooperativeName = scopedFromKeys([
+      'cooperativeName',
+    ], (profileData?.cooperativeName ?? 'N/A').toString());
+    final cooperativePosition = scopedFromKeys([
+      'cooperativePosition',
+    ], (profileData?.cooperativePosition ?? 'N/A').toString());
+    final dateOfMembership = scopedFromKeys([
+      'dateOfMembership',
+    ], (profileData?.dateOfMembership ?? 'N/A').toString());
+    final cooperativePositionOthers = scopedFromKeys([
+      'cooperativePositionOthers',
+    ], (profileData?.cooperativePositionOthers ?? '___________').toString());
+    final isOtherCoopPosition =
+        cooperativePosition.trim().toLowerCase() == 'other';
+    final saadEntries = _toCommodityEntryList(profileData?.saadCommodities);
+    final nonSaadEntries = _toCommodityEntryList(
+      profileData?.nonSAADCommodities,
+    );
+
     return Container(
       margin: EdgeInsets.only(bottom: 12 * scale),
       decoration: BoxDecoration(
@@ -588,7 +707,9 @@ class _DataViewModalState extends State<DataViewModal> {
                   ),
                 ),
                 Icon(
-                  isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  isExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
                   color: Colors.grey.shade600,
                 ),
               ],
@@ -600,36 +721,78 @@ class _DataViewModalState extends State<DataViewModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Year Covered: $year', style: GoogleFonts.poppins(fontSize: labelSize)),
+                  Text(
+                    'Year Covered: $year',
+                    style: GoogleFonts.poppins(fontSize: labelSize),
+                  ),
                   SizedBox(height: 8 * scale),
                   _buildInfoRow(
+                    'Organization Name:',
+                    cooperativeName,
+                    'Position:',
+                    cooperativePosition,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  _buildSingleRow(
+                    'Date of Membership:',
+                    dateOfMembership,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  if (isOtherCoopPosition)
+                    _buildSingleRow(
+                      'If Other Position, specify:',
+                      cooperativePositionOthers,
+                      labelSize - 1 * scale,
+                      valueSize - 1 * scale,
+                      scale,
+                    ),
+                  _buildInfoRow(
+                    'Main Primary Commodity:',
+                    primaryCommodity,
+                    'Main Secondary Commodity:',
+                    secondaryCommodity,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  _buildInfoRow(
                     'Received Primary Commodity:',
-                    profileData.primaryCommodityRecurrence == true ? 'Yes' : 'No',
+                    receivedPrimaryCommodity,
                     'Received Secondary Commodity:',
-                    profileData.secondaryCommodityRecurrence == true ? 'Yes' : 'No',
+                    receivedSecondaryCommodity,
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
                   ),
                   // No remarks are shown for recurrence (no fields exist); if a recurrence-specify field exists
-                  if ((profileData.primaryCommodityRecurrenceOthers ?? '').toString().isNotEmpty)
+                  if ((profileData.primaryCommodityRecurrenceOthers ?? '')
+                      .toString()
+                      .isNotEmpty)
                     _buildSingleRow(
                       'If Primary Received Other, specify:',
-                      profileData.primaryCommodityRecurrenceOthers ?? '___________',
+                      profileData.primaryCommodityRecurrenceOthers ??
+                          '___________',
                       labelSize - 1 * scale,
                       valueSize - 1 * scale,
                       scale,
                     ),
-                  if ((profileData.secondaryCommodityRecurrenceOthers ?? '').toString().isNotEmpty)
+                  if ((profileData.secondaryCommodityRecurrenceOthers ?? '')
+                      .toString()
+                      .isNotEmpty)
                     _buildSingleRow(
                       'If Secondary Received Other, specify:',
-                      profileData.secondaryCommodityRecurrenceOthers ?? '___________',
+                      profileData.secondaryCommodityRecurrenceOthers ??
+                          '___________',
                       labelSize - 1 * scale,
                       valueSize - 1 * scale,
                       scale,
                     ),
                   _buildSingleRow(
-                    'No. of Family Members:\nMale: ${profileData.numberOfMalesInFamily ?? 0}     Female: ${profileData.numberOfFemalesInFamily ?? 0}',
+                    'No. of Family Members:\nMale: $maleFamily     Female: $femaleFamily',
                     '',
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
@@ -637,20 +800,20 @@ class _DataViewModalState extends State<DataViewModal> {
                   ),
                   _buildInfoRow(
                     'Land Tenureship:',
-                    profileData.landTenureship ?? 'N/A',
+                    landTenureship,
                     'If Other, specify:',
-                    profileData.landTenureshipOthers ?? '___________',
+                    landTenureshipOthers,
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
                   ),
                   Text(
-                    'No of Years Farming/Fishing: ${profileData.yearsInFarming ?? 0}',
+                    'No of Years Farming/Fishing: $yearsInFarming',
                     style: GoogleFonts.poppins(fontSize: labelSize),
                   ),
-                  
+
                   SizedBox(height: 12 * scale),
-                  
+
                   // MONTHLY FAMILY INCOME
                   Container(
                     width: double.infinity,
@@ -673,18 +836,89 @@ class _DataViewModalState extends State<DataViewModal> {
                   SizedBox(height: 8 * scale),
                   _buildInfoRow(
                     'From Agri-Related (Gross):',
-                    '₱${profileData.agriRelatedIncome ?? 0}',
+                    _formatPesoWhole(agriRelatedIncome),
                     'SAAD Net Income:',
-                    '₱${profileData.saadNetIncome ?? 0}',
+                    _formatPesoWhole(saadNetIncome),
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
                   ),
                   _buildInfoRow(
+                    'Non-SAAD Net Income:',
+                    _formatPesoWhole(nonSaadNetIncomeScoped),
                     'From Non-Agri (Gross):',
-                    '₱${profileData.nonAgriRelatedIncome ?? 0}',
+                    _formatPesoWhole(nonAgriRelatedIncome),
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  _buildSingleRow(
                     'Main Sources:',
-                    profileData.mainSourcesOfIncome ?? 'N/A',
+                    mainSourcesOfIncome,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  SizedBox(height: 10 * scale),
+                  _buildCommodityDetailsSection(
+                    sectionTitle: 'SAAD Commodity Details',
+                    entries: saadEntries,
+                    labelSize: labelSize,
+                    valueSize: valueSize,
+                    scale: scale,
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildCommodityDetailsSection(
+                    sectionTitle: 'Non-SAAD Commodity Details',
+                    entries: nonSaadEntries,
+                    labelSize: labelSize,
+                    valueSize: valueSize,
+                    scale: scale,
+                  ),
+                  SizedBox(height: 10 * scale),
+                  _buildMultilineField(
+                    'Beneficiary (Farmer) Income Breakdown:',
+                    beneficiaryIncome,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildMultilineField(
+                    'Beneficiary Remarks:',
+                    beneficiaryRemarks,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildMultilineField(
+                    'Spouse Income Breakdown:',
+                    spouseIncome,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildMultilineField(
+                    'Spouse Remarks:',
+                    spouseRemarks,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildMultilineField(
+                    'Other Household Members Income Breakdown:',
+                    otherMembersIncome,
+                    labelSize - 1 * scale,
+                    valueSize - 1 * scale,
+                    scale,
+                  ),
+                  SizedBox(height: 8 * scale),
+                  _buildMultilineField(
+                    'Other Members Remarks:',
+                    otherMembersRemarks,
                     labelSize - 1 * scale,
                     valueSize - 1 * scale,
                     scale,
@@ -697,43 +931,228 @@ class _DataViewModalState extends State<DataViewModal> {
     );
   }
 
-  /// MULTILINE FARM INCOME DISPLAY - 1 FIELD FOR AMOUNTS, 1 FOR REMARKS
-  Widget _buildFarmIncomeMultiline(double labelSize, double valueSize, double scale) {
-    final profileData = _getProfileData();
-    
+  String _formatPesoWhole(dynamic value) {
+    if (value == null) return '₱0';
+    if (value is num) return '₱${value.round()}';
+    final parsed = num.tryParse(value.toString().replaceAll(',', '').trim());
+    return '₱${(parsed ?? 0).round()}';
+  }
+
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString().replaceAll(',', '').trim()) ?? 0.0;
+  }
+
+  double _calculateMonthlyNetFromEntries(dynamic entries) {
+    if (entries is! List || entries.isEmpty) return 0.0;
+    double monthlyTotal = 0.0;
+    for (final item in entries) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final totalAmount = _toDouble(map['totalAmount']);
+      final expenses = _toDouble(map['expenses']);
+      final net = totalAmount - expenses;
+      if (net > 0) {
+        monthlyTotal += net / 12;
+      }
+    }
+    return monthlyTotal.roundToDouble();
+  }
+
+  double _resolveNonSaadNetIncome(dynamic profileData) {
+    final stored = _toDouble(profileData?.nonSAADNetIncome);
+    if (stored > 0) return stored;
+    return _calculateMonthlyNetFromEntries(profileData?.nonSAADCommodities);
+  }
+
+  List<Map<String, dynamic>> _toCommodityEntryList(dynamic entries) {
+    if (entries is List) {
+      return entries
+          .whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  String _safeEntryValue(Map<String, dynamic> entry, String key) {
+    final value = entry[key];
+    if (value == null) return 'N/A';
+    final text = value.toString().trim();
+    return text.isEmpty ? 'N/A' : text;
+  }
+
+  String _safeEntryValueFromKeys(
+    Map<String, dynamic> entry,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = entry[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return 'N/A';
+  }
+
+  Widget _buildCommodityDetailsSection({
+    required String sectionTitle,
+    required List<Map<String, dynamic>> entries,
+    required double labelSize,
+    required double valueSize,
+    required double scale,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCommodityDisplay('Rice / Corn', profileData?.riceIncomeField, profileData?.riceRemarks, labelSize, valueSize, scale),
-        SizedBox(height: 12 * scale),
-        _buildCommodityDisplay('HVC', profileData?.hvcIncomeField, profileData?.hvcRemarks, labelSize, valueSize, scale),
-        SizedBox(height: 12 * scale),
-        _buildCommodityDisplay('Livestock', profileData?.livestockIncomeField, profileData?.livestockRemarks, labelSize, valueSize, scale),
-        SizedBox(height: 12 * scale),
-        _buildCommodityDisplay('Fishing', profileData?.fishingIncomeField, profileData?.fishingRemarks, labelSize, valueSize, scale),
-        SizedBox(height: 12 * scale),
-        _buildCommodityDisplay('Non-Farm Fisheries', profileData?.nonFarmFisheriesIncomeField, profileData?.nonFarmFisheriesRemarks, labelSize, valueSize, scale),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(vertical: 6 * scale),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(6 * scale),
+          ),
+          child: Center(
+            child: Text(
+              sectionTitle,
+              style: GoogleFonts.poppins(
+                fontSize: labelSize,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 8 * scale),
+        if (entries.isEmpty)
+          _buildMultilineField(
+            'Entries:',
+            'No commodity details saved yet.',
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          )
+        else
+          ...List.generate(entries.length, (index) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: 10 * scale),
+              child: _buildCommodityEntryCard(
+                entryIndex: index,
+                entry: entries[index],
+                labelSize: labelSize,
+                valueSize: valueSize,
+                scale: scale,
+              ),
+            );
+          }),
       ],
     );
   }
 
-  Widget _buildCommodityDisplay(String title, String? amount, String? remarks, double labelSize, double valueSize, double scale) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: labelSize + 2 * scale,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
+  Widget _buildCommodityEntryCard({
+    required int entryIndex,
+    required Map<String, dynamic> entry,
+    required double labelSize,
+    required double valueSize,
+    required double scale,
+  }) {
+    final maleCount = _safeEntryValue(entry, 'maleCount');
+    final femaleCount = _safeEntryValue(entry, 'femaleCount');
+    final hasSexCounts = maleCount != 'N/A' || femaleCount != 'N/A';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12 * scale),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10 * scale),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Entry ${entryIndex + 1}',
+            style: GoogleFonts.poppins(
+              fontSize: labelSize,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
           ),
-        ),
-        SizedBox(height: 8 * scale),
-        _buildMultilineField('Amount:', amount ?? '___________', labelSize, valueSize, scale),
-        SizedBox(height: 8 * scale),
-        _buildMultilineField('Remarks:', remarks ?? '___________', labelSize, valueSize, scale),
-      ],
+          SizedBox(height: 10 * scale),
+          _buildInfoRow(
+            'Type:',
+            _safeEntryValue(entry, 'type'),
+            'Commodity:',
+            _safeEntryValueFromKeys(entry, [
+              'commodity',
+              'commodityName',
+              'item',
+            ]),
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          ),
+          _buildInfoRow(
+            'Sale Method:',
+            _safeEntryValueFromKeys(entry, ['saleMeth', 'saleMethod']),
+            'Product Form:',
+            _safeEntryValueFromKeys(entry, ['productForm', 'product']),
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          ),
+          _buildInfoRow(
+            'Pricing Basis:',
+            _safeEntryValueFromKeys(entry, ['pricingBasis', 'pricing']),
+            'Unit:',
+            _safeEntryValue(entry, 'unit'),
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          ),
+          if (hasSexCounts)
+            _buildInfoRow(
+              'Male Count:',
+              maleCount,
+              'Female Count:',
+              femaleCount,
+              labelSize - 1 * scale,
+              valueSize - 1 * scale,
+              scale,
+            ),
+          _buildInfoRow(
+            'Total Weight:',
+            _safeEntryValueFromKeys(entry, ['totalWeight', 'weight']),
+            'Total Amount:',
+            _safeEntryValueFromKeys(entry, ['totalAmount', 'amount']),
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          ),
+          _buildSingleRow(
+            'Expenses:',
+            _safeEntryValueFromKeys(entry, ['expenses', 'expense']),
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          ),
+          _buildSingleRow(
+            'Remarks:',
+            _safeEntryValueFromKeys(entry, [
+              'remarks',
+              'remark',
+              'comments',
+              'note',
+              'notes',
+            ]),
+            labelSize - 1 * scale,
+            valueSize - 1 * scale,
+            scale,
+          ),
+        ],
+      ),
     );
   }
 
@@ -779,9 +1198,34 @@ class _DataViewModalState extends State<DataViewModal> {
     );
   }
 
-  Widget _buildBottomButtons(BuildContext context, double buttonHeight, double buttonFontSize, double buttonSpacing) {
+  Widget _buildBottomButtons(
+    BuildContext context,
+    double buttonHeight,
+    double buttonFontSize,
+    double buttonSpacing,
+  ) {
+    final profileData = _getProfileData();
+    final isExistingUnsync =
+        widget.dataStatus == 'Unsync' && profileData?.isExistingFarmer == true;
+
     // UNSYNC: Edit + Sync
     if (widget.dataStatus == 'Unsync') {
+      if (isExistingUnsync) {
+        return Row(
+          children: [
+            Expanded(
+              child: _buildButton(
+                'Sync',
+                DAColors.primaryGreen,
+                widget.onSync ?? () {},
+                buttonHeight,
+                buttonFontSize,
+              ),
+            ),
+          ],
+        );
+      }
+
       return Row(
         children: [
           Expanded(
@@ -848,7 +1292,13 @@ class _DataViewModalState extends State<DataViewModal> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildButton(String label, Color color, VoidCallback onTap, double height, double fontSize) {
+  Widget _buildButton(
+    String label,
+    Color color,
+    VoidCallback onTap,
+    double height,
+    double fontSize,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

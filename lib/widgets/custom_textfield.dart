@@ -12,6 +12,7 @@ class CustomTextField extends StatelessWidget {
   final Function(String)? onChanged;
   final bool isSearch;
   final bool obscureText;
+  final bool readOnly;
   final TextInputType? keyboardType;
 
   const CustomTextField({
@@ -24,6 +25,7 @@ class CustomTextField extends StatelessWidget {
     this.onChanged,
     this.isSearch = false,
     this.obscureText = false,
+    this.readOnly = false,
     this.keyboardType,
   });
 
@@ -31,7 +33,7 @@ class CustomTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: readOnly ? Colors.grey.shade100 : Colors.white,
         borderRadius: BorderRadius.circular(isSearch ? 30 : 12),
         boxShadow: [
           BoxShadow(
@@ -43,6 +45,7 @@ class CustomTextField extends StatelessWidget {
       ),
       child: TextField(
         controller: controller,
+        readOnly: readOnly,
         obscureText: obscureText,
         keyboardType: keyboardType,
         decoration: InputDecoration(

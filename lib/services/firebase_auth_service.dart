@@ -84,8 +84,9 @@ class FirebaseAuthService {
   Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
       // Try reading with simple retry/backoff in case of transient errors
-      final doc = await _withRetry<DocumentSnapshot>(() =>
-          _firestore.collection('users').doc(uid).get());
+      final doc = await _withRetry<DocumentSnapshot>(
+        () => _firestore.collection('users').doc(uid).get(),
+      );
 
       final data = doc.data() as Map<String, dynamic>?;
 
@@ -102,7 +103,14 @@ class FirebaseAuthService {
           final prefs = await SharedPreferences.getInstance();
           final minimal = <String, dynamic>{};
           if (data.containsKey('role')) minimal['role'] = data['role'];
-          if (data.containsKey('accountStatus')) minimal['accountStatus'] = data['accountStatus'];
+          if (data.containsKey('accountStatus'))
+            minimal['accountStatus'] = data['accountStatus'];
+          final firstName = (data['firstName'] ?? '').toString().trim();
+          if (firstName.isNotEmpty) minimal['firstName'] = firstName;
+          final surname = (data['surname'] ?? data['lastName'] ?? '')
+              .toString()
+              .trim();
+          if (surname.isNotEmpty) minimal['surname'] = surname;
           await prefs.setString('user_data_$uid', jsonEncode(minimal));
         } catch (_) {}
       }
@@ -121,6 +129,17 @@ class FirebaseAuthService {
       if (raw == null) return null;
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       return decoded;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Get cached display first name for current UID when Firestore is unavailable.
+  Future<String?> getCachedFirstName(String uid) async {
+    try {
+      final cached = await getCachedUserData(uid);
+      final value = (cached?['firstName'] ?? '').toString().trim();
+      return value.isEmpty ? null : value;
     } catch (_) {
       return null;
     }
@@ -271,7 +290,8 @@ class FirebaseAuthService {
     // 3) Fetch from Firestore with retry/backoff
     try {
       final doc = await _withRetry<DocumentSnapshot>(
-          () => _firestore.collection('users').doc(uid).get());
+        () => _firestore.collection('users').doc(uid).get(),
+      );
       final role = doc['role'] as String?;
       if (role != null && role.isNotEmpty) {
         _roleCache[uid] = role;
@@ -293,8 +313,11 @@ class FirebaseAuthService {
   }
 
   /// Utility: run a future with simple exponential backoff retries
-  Future<T> _withRetry<T>(Future<T> Function() fn,
-      {int retries = 3, int initialDelayMs = 300}) async {
+  Future<T> _withRetry<T>(
+    Future<T> Function() fn, {
+    int retries = 3,
+    int initialDelayMs = 300,
+  }) async {
     int attempt = 0;
     int delayMs = initialDelayMs;
     while (true) {
