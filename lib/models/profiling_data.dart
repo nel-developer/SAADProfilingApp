@@ -119,8 +119,10 @@ class ProfilingData {
   String? tempIdFirebase;
   DateTime? createdAt;
   DateTime? updatedAt;
+  int? draftStep;
 
   // Cooperative fields
+  bool? hasOrganization;
   String? cooperativeName;
   String? cooperativePosition;
   String? dateOfMembership;
@@ -211,6 +213,7 @@ class ProfilingData {
     this.spouseRemarks,
     this.otherMembersNonFarmIncome,
     this.otherMembersRemarks,
+    this.hasOrganization,
     this.cooperativeName,
     this.cooperativePosition,
     this.dateOfMembership,
@@ -231,6 +234,7 @@ class ProfilingData {
     this.tempIdFirebase,
     this.createdAt,
     this.updatedAt,
+    this.draftStep,
   });
 
   // Backwards-compatible getters used by older UI code
@@ -321,6 +325,7 @@ class ProfilingData {
       'spouseNonFarmIncome': spouseNonFarmIncome,
       'otherMembersNonFarmIncome': otherMembersNonFarmIncome,
       'otherMembersRemarks': otherMembersRemarks,
+      'hasOrganization': hasOrganization,
       'cooperativeName': cooperativeName,
       'cooperativePosition': cooperativePosition,
       'dateOfMembership': dateOfMembership,
@@ -334,6 +339,7 @@ class ProfilingData {
       'tempIdFirebase': tempIdFirebase,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'draftStep': draftStep,
     };
   }
 }

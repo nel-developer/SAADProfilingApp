@@ -4,6 +4,7 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 8 of 11 — Recurrence
 ///
@@ -31,6 +32,7 @@ class Step07Recurrence extends StatefulWidget {
 }
 
 class _Step07RecurrenceState extends State<Step07Recurrence> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   // ── Controllers ──
   final TextEditingController _maleCtrl = TextEditingController();
   final TextEditingController _femaleCtrl = TextEditingController();
@@ -172,6 +174,7 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
         'landTenureship': land,
         'landTenureshipOthers': landOther,
         'cooperativeName': data.cooperativeName,
+        'hasOrganization': data.hasOrganization,
         'cooperativePosition': data.cooperativePosition,
         'dateOfMembership': data.dateOfMembership,
         'cooperativePositionOthers': data.cooperativePositionOthers,

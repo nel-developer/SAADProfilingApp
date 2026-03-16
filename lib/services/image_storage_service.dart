@@ -447,6 +447,21 @@ class ImageStorageService {
 
       final draftFile = File('${farmerDir.path}/$fileName');
 
+      // Keep only one profiling JSON per farmer folder so stale files from
+      // renamed/mutated names do not get loaded as the latest draft.
+      await for (final entity in farmerDir.list(
+        recursive: false,
+        followLinks: false,
+      )) {
+        if (entity is! File) continue;
+        final entityName = p.basename(entity.path).toLowerCase();
+        if (!entityName.endsWith('_profiling_data.json')) continue;
+        if (entity.path == draftFile.path) continue;
+        try {
+          await entity.delete();
+        } catch (_) {}
+      }
+
       // Convert map to JSON string with pretty formatting
       final jsonString = const JsonEncoder.withIndent('  ').convert(draftData);
       await draftFile.writeAsString(jsonString);

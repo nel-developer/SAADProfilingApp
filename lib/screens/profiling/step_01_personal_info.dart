@@ -76,25 +76,34 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
   }
 
   void _loadData() {
-    // Prefill from shared currentData if available
-    if (widget.currentData != null) {
-      _isExistingFarmer = widget.currentData!.isExistingFarmer == true;
-      _firstNameCtrl.text = widget.currentData!.firstName ?? '';
-      _middleNameCtrl.text = widget.currentData!.middleName ?? '';
-      _surnameCtrl.text = widget.currentData!.surname ?? '';
-      _selectedExistingSaadId =
-          widget.currentData!.selectedExistingSaadId ??
-          widget.currentData!.saadIdNo;
-      _saadSearchCtrl.text = _selectedExistingSaadId ?? '';
-      final savedExtension = widget.currentData!.extensionName?.trim();
-      _selectedExtension =
-          (savedExtension != null && _extensionOptions.contains(savedExtension))
-          ? savedExtension
-          : null;
-      _forceUppercase(_firstNameCtrl);
-      _forceUppercase(_middleNameCtrl);
-      _forceUppercase(_surnameCtrl);
+    final data = widget.currentData;
+    if (data == null) return;
+
+    // Always open Step 1 as New Farmer on profiling reopen.
+    _isExistingFarmer = false;
+    _selectedExistingSaadId = null;
+    _saadSearchCtrl.clear();
+    data.isExistingFarmer = false;
+    data.selectedExistingSaadId = null;
+    data.saadIdNo = null;
+    data.rsbsaFishrIdNo = null;
+
+    // Restore typed values from draft while keeping mode as New Farmer.
+    _firstNameCtrl.text = data.firstName ?? '';
+    _middleNameCtrl.text = data.middleName ?? '';
+    _surnameCtrl.text = data.surname ?? '';
+    final savedExtension = data.extensionName?.trim();
+    if (savedExtension == null || savedExtension.isEmpty) {
+      _selectedExtension = null;
+    } else {
+      _selectedExtension = _extensionOptions.firstWhere(
+        (option) => option.toLowerCase() == savedExtension.toLowerCase(),
+        orElse: () => savedExtension,
+      );
     }
+    _forceUppercase(_firstNameCtrl);
+    _forceUppercase(_middleNameCtrl);
+    _forceUppercase(_surnameCtrl);
   }
 
   Future<void> _loadExistingFarmers() async {
@@ -130,14 +139,18 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
   void _applyExistingFarmer(ProfilingData selected) {
     if (widget.currentData == null) return;
 
+    _selectedExistingSaadId = selected.saadIdNo?.trim();
+    _saadSearchCtrl.text = _selectedExistingSaadId ?? '';
     _firstNameCtrl.text = selected.firstName ?? '';
     _middleNameCtrl.text = selected.middleName ?? '';
     _surnameCtrl.text = selected.surname ?? '';
     final savedExtension = selected.extensionName?.trim();
-    _selectedExtension =
-        (savedExtension != null && _extensionOptions.contains(savedExtension))
-        ? savedExtension
-        : null;
+    _selectedExtension = (savedExtension == null || savedExtension.isEmpty)
+        ? null
+        : _extensionOptions.firstWhere(
+            (option) => option.toLowerCase() == savedExtension.toLowerCase(),
+            orElse: () => savedExtension,
+          );
     _forceUppercase(_firstNameCtrl);
     _forceUppercase(_middleNameCtrl);
     _forceUppercase(_surnameCtrl);
@@ -165,23 +178,84 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
     target.spouseName = selected.spouseName;
   }
 
+  void _clearSharedDataForNewFarmer() {
+    final data = widget.currentData;
+    if (data == null) return;
+
+    data.selectedExistingSaadId = null;
+    data.saadIdNo = null;
+    data.rsbsaFishrIdNo = null;
+
+    data.firstName = null;
+    data.middleName = null;
+    data.surname = null;
+    data.extensionName = null;
+
+    data.region = null;
+    data.province = null;
+    data.municipality = null;
+    data.barangay = null;
+    data.sitioPurok = null;
+    data.dateOfBirth = null;
+    data.sex = null;
+
+    data.isIndigenous = null;
+    data.indigenousGroup = null;
+    data.isPWD = null;
+    data.maritalStatus = null;
+    data.spouseName = null;
+    data.tribeEthnicity = null;
+  }
+
+  void _switchToNewFarmerMode() {
+    _isExistingFarmer = false;
+    _selectedExistingSaadId = null;
+    _saadSearchCtrl.clear();
+    _selectedExtension = null;
+
+    _firstNameCtrl.clear();
+    _middleNameCtrl.clear();
+    _surnameCtrl.clear();
+
+    _clearSharedDataForNewFarmer();
+  }
+
+  void _switchToExistingFarmerMode() {
+    _isExistingFarmer = true;
+    _selectedExistingSaadId = null;
+    _saadSearchCtrl.clear();
+    _selectedExtension = null;
+
+    _firstNameCtrl.clear();
+    _middleNameCtrl.clear();
+    _surnameCtrl.clear();
+
+    _clearSharedDataForNewFarmer();
+  }
+
   @override
   void didUpdateWidget(Step01PersonalInfo oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload data when returning to this step or when currentData changes
-    _loadData();
+    // Keep local in-memory state authoritative while this step widget is alive.
+    // Avoid reloads on parent rebuilds to prevent accidental field resets.
   }
 
   void _autoSaveToCurrentData() {
     if (widget.currentData != null) {
       widget.currentData!.isExistingFarmer = _isExistingFarmer;
-      widget.currentData!.selectedExistingSaadId = _selectedExistingSaadId;
+      widget.currentData!.selectedExistingSaadId = _isExistingFarmer
+          ? _selectedExistingSaadId
+          : null;
+      if (!_isExistingFarmer) {
+        widget.currentData!.saadIdNo = null;
+        widget.currentData!.rsbsaFishrIdNo = null;
+      }
       widget.currentData!.firstName = _firstNameCtrl.text.trim().toUpperCase();
       widget.currentData!.middleName = _middleNameCtrl.text
           .trim()
           .toUpperCase();
       widget.currentData!.surname = _surnameCtrl.text.trim().toUpperCase();
-      widget.currentData!.extensionName = _selectedExtension?.toUpperCase();
+      widget.currentData!.extensionName = _selectedExtension?.trim();
     }
   }
 
@@ -209,7 +283,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
     }
   }
 
-  List<String> _filteredExistingSaadIds() {
+  List<String> _existingSaadIds() {
     final all =
         _existingFarmers
             .map((farmer) => farmer.saadIdNo?.trim() ?? '')
@@ -217,10 +291,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
             .toSet()
             .toList()
           ..sort();
-
-    final query = _saadSearchCtrl.text.trim().toLowerCase();
-    if (query.isEmpty) return all;
-    return all.where((id) => id.toLowerCase().contains(query)).toList();
+    return all;
   }
 
   void _handleNext() {
@@ -248,7 +319,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
           .trim()
           .toUpperCase();
       widget.currentData!.surname = _surnameCtrl.text.trim().toUpperCase();
-      widget.currentData!.extensionName = _selectedExtension?.toUpperCase();
+      widget.currentData!.extensionName = _selectedExtension?.trim();
     }
     widget.onNext();
   }
@@ -296,13 +367,10 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
               items: const ['New Farmer', 'Existing Farmer'],
               onChanged: (value) {
                 setState(() {
-                  _isExistingFarmer = value == 'Existing Farmer';
-                  if (!_isExistingFarmer) {
-                    _selectedExistingSaadId = null;
-                    if (widget.currentData != null) {
-                      widget.currentData!.isExistingFarmer = false;
-                      widget.currentData!.selectedExistingSaadId = null;
-                    }
+                  if (value == 'Existing Farmer') {
+                    _switchToExistingFarmerMode();
+                  } else {
+                    _switchToNewFarmerMode();
                   }
                 });
                 _autoSaveToCurrentData();
@@ -312,30 +380,15 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
 
           if (_isExistingFarmer) ...[
             SizedBox(height: fieldGap),
-            _label('Search SAAD I.D No.', labelSize),
+            _label('Search & Select Existing Farmer (SAAD I.D No.)', labelSize),
             SizedBox(height: labelFieldGap),
             SizedBox(
-              height: fieldHeight,
-              child: _shadowedField(
-                controller: _saadSearchCtrl,
-                hint: 'Type SAAD I.D No.',
-                readOnly: _loadingExistingFarmers,
-                onChanged: (_) {
-                  setState(() {});
-                },
-              ),
-            ),
-            SizedBox(height: fieldGap),
-            _label('Select Existing Farmer (SAAD I.D No.)', labelSize),
-            SizedBox(height: labelFieldGap),
-            SizedBox(
-              height: fieldHeight,
-              child: _shadowedDropdown(
+              child: _shadowedSearchableSaadDropdown(
                 value: _selectedExistingSaadId,
                 hint: _loadingExistingFarmers
                     ? 'Loading existing farmers...'
                     : 'Select SAAD I.D No.',
-                items: _filteredExistingSaadIds(),
+                items: _existingSaadIds(),
                 onChanged: _loadingExistingFarmers
                     ? (_) {}
                     : (value) {
@@ -346,8 +399,6 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
                         if (selected.isEmpty) return;
 
                         setState(() {
-                          _selectedExistingSaadId = value;
-                          _saadSearchCtrl.text = value;
                           _applyExistingFarmer(selected.first);
                         });
                         _autoSaveToCurrentData();
@@ -369,6 +420,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
                 controller: _firstNameCtrl,
                 hint: 'Enter First Name',
                 readOnly: false,
+                onChanged: (_) => _autoSaveToCurrentData(),
               ),
             ),
 
@@ -382,6 +434,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
                 controller: _middleNameCtrl,
                 hint: 'Enter Middle Name',
                 readOnly: false,
+                onChanged: (_) => _autoSaveToCurrentData(),
               ),
             ),
 
@@ -395,6 +448,7 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
                 controller: _surnameCtrl,
                 hint: 'Enter Surname',
                 readOnly: false,
+                onChanged: (_) => _autoSaveToCurrentData(),
               ),
             ),
 
@@ -630,6 +684,80 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
           return DropdownMenuItem<String>(value: item, child: Text(item));
         }).toList(),
         onChanged: enabled ? onChanged : null,
+      ),
+    );
+  }
+
+  Widget _shadowedSearchableSaadDropdown({
+    required String? value,
+    required String hint,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final uniqueItems = items.toSet().toList()..sort();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: DAColors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 12,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: DropdownMenuTheme(
+        data: DropdownMenuThemeData(
+          inputDecorationTheme: InputDecorationTheme(
+            hintStyle: GoogleFonts.poppins(
+              color: Colors.grey.shade400,
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
+            filled: true,
+            fillColor: DAColors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: DAColors.primaryGreen, width: 2),
+            ),
+          ),
+        ),
+        child: DropdownMenu<String>(
+          width: double.infinity,
+          controller: _saadSearchCtrl,
+          initialSelection: value,
+          hintText: hint,
+          enableFilter: true,
+          enableSearch: true,
+          requestFocusOnTap: true,
+          dropdownMenuEntries: uniqueItems
+              .map(
+                (item) => DropdownMenuEntry<String>(value: item, label: item),
+              )
+              .toList(),
+          onSelected: onChanged,
+        ),
       ),
     );
   }

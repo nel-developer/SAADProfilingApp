@@ -5,6 +5,7 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 import 'package:da_project_1/services/local_commodity_cache.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 6 of 10 — Main Commodity
 /// Fields: Primary Commodity (single dropdown), Secondary Commodities (checkboxes, exclude main)
@@ -27,6 +28,7 @@ class Step06MainCommodity extends StatefulWidget {
 }
 
 class _Step06MainCommodityState extends State<Step06MainCommodity> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   String? _primaryCommodity; // Just type name
   Set<String> _selectedSecondaryOptions = {}; // Checkboxes for secondary types
   String?
@@ -104,7 +106,14 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
   }
 
   @override
+  void deactivate() {
+    _autoSaveToCurrentData();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _autoSaveToCurrentData();
     _primaryOthersCtrl.dispose();
     super.dispose();
   }
@@ -112,7 +121,8 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
   @override
   void didUpdateWidget(Step06MainCommodity oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadData();
+    // Keep local in-memory state authoritative while this step widget is alive.
+    // Avoid reloads on parent rebuilds to prevent accidental field resets.
   }
 
   void _handleNext() {

@@ -5,6 +5,7 @@ import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 import 'package:da_project_1/services/location_service.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 2 of 8 — Address Information
 /// Fields: Region, Province, Municipality/City, Barangay, Sitio/Purok, Date of Birth, Sex
@@ -27,6 +28,7 @@ class Step02AddressInfo extends StatefulWidget {
 }
 
 class _Step02AddressInfoState extends State<Step02AddressInfo> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   final TextEditingController _regionCtrl = TextEditingController();
   final TextEditingController _provinceCtrl = TextEditingController();
   final TextEditingController _municipalityCtrl = TextEditingController();
@@ -610,7 +612,7 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        value: safeValue,
+        initialValue: safeValue,
         isExpanded: true,
         decoration: InputDecoration(
           hintText: hint,

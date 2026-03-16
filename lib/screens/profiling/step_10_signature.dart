@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 import 'package:da_project_1/services/image_storage_service.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -35,6 +36,7 @@ class Step10Signature extends StatefulWidget {
 }
 
 class _Step10SignatureState extends State<Step10Signature> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   String? _idType;
   File? _idFrontImage;
   File? _idBackImage;
@@ -64,7 +66,8 @@ class _Step10SignatureState extends State<Step10Signature> {
   @override
   void didUpdateWidget(Step10Signature oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadData();
+    // Keep local in-memory state authoritative while this step widget is alive.
+    // Avoid reloads on parent rebuilds to prevent accidental field resets.
   }
 
   void _loadData() {
@@ -108,6 +111,18 @@ class _Step10SignatureState extends State<Step10Signature> {
     widget.currentData!.idBackImagePath = _idBackImage?.path;
     widget.currentData!.farmerPhotoPath = _farmerPhoto?.path;
     widget.currentData!.signatureImage = _signatureImage;
+  }
+
+  @override
+  void deactivate() {
+    _saveMediaToCurrentData();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _saveMediaToCurrentData();
+    super.dispose();
   }
 
   @override

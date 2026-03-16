@@ -29,7 +29,14 @@ class ProfilingFlow extends StatefulWidget {
   State<ProfilingFlow> createState() => _ProfilingFlowState();
 }
 
-class _ProfilingFlowState extends State<ProfilingFlow> {
+class _ProfilingFlowState extends State<ProfilingFlow>
+    with WidgetsBindingObserver {
+  // In-memory session store: persists across navigation within the same app session.
+  // Replaces async disk/prefs draft — no spinner, no disk writes on back-navigation.
+  static ProfilingData? _sessionData;
+  static int _sessionStep = 1;
+  static Set<int> _sessionInitializedSteps = {1};
+
   int _currentStep = 1;
   ProfilingData _currentData = ProfilingData();
   final ProfilingStorageService _storage = ProfilingStorageService();
@@ -39,12 +46,23 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
   @override
   void initState() {
     super.initState();
-    _loadDraftIfExists();
-    // Do NOT auto-generate temp ID on flow open — only when saving to Firestore
+    WidgetsBinding.instance.addObserver(this);
+    // Restore in-memory session synchronously — step widgets build with full data
+    if (_sessionData != null) {
+      _currentData = _sessionData!;
+      _currentStep = _sessionStep;
+      _initializedSteps
+        ..clear()
+        ..addAll(_sessionInitializedSteps);
+    } else {
+      // First open — seed session with the fresh ProfilingData object
+      _sessionData = _currentData;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     // NEVER auto-delete draft on dispose
     // User data is precious - keep it even if they navigate away
     // Only delete if user explicitly taps "Cancel" button
@@ -58,35 +76,47 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
 
   // Temp ID generation removed — only set when saving to Firestore pending collection
 
-  Future<void> _loadDraftIfExists() async {
-    try {
-      final draft = await _storage.loadDraftLocally();
-      if (!mounted) return;
-      if (draft != null) {
-        setState(() {
-          _currentData = draft;
-        });
-      }
-    } catch (e) {
-      debugPrint('❌ Error loading draft: $e');
+  void _persistCurrentDraft() {
+    _sessionData = _currentData;
+    _sessionStep = _currentStep;
+    _sessionInitializedSteps = Set<int>.from(_initializedSteps);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _persistCurrentDraft();
     }
   }
 
-  Future<void> _persistCurrentDraft() async {
-    try {
-      _currentData.status = 'Draft';
-      await _storage.saveDraftLocally(_currentData);
-    } catch (e) {
-      debugPrint('⚠️ Error persisting in-progress draft: $e');
+  int _resolveNextStep(int currentStep) {
+    final isExistingFarmer = _currentData.isExistingFarmer == true;
+    if (!isExistingFarmer) {
+      return (currentStep + 1).clamp(1, 11);
     }
+
+    // Existing farmer recurrence flow: skip Address and Other Personal.
+    if (currentStep == 1) return 4;
+    return (currentStep + 1).clamp(1, 11);
   }
 
-  void _goToNextStep() async {
-    await _persistCurrentDraft();
-    if (!mounted) return;
+  int _resolvePreviousStep(int currentStep) {
+    final isExistingFarmer = _currentData.isExistingFarmer == true;
+    if (!isExistingFarmer) {
+      return (currentStep - 1).clamp(1, 11);
+    }
 
+    // Existing farmer recurrence flow: skip Address and Other Personal.
+    if (currentStep == 4) return 1;
+    return (currentStep - 1).clamp(1, 11);
+  }
+
+  void _goToNextStep() {
+    _persistCurrentDraft();
     if (_currentStep < 11) {
-      final nextStep = _currentStep + 1;
+      final nextStep = _resolveNextStep(_currentStep);
       setState(() {
         _currentStep = nextStep;
         _initializedSteps.add(nextStep);
@@ -96,11 +126,10 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
     }
   }
 
-  void _goToPreviousStep() async {
-    await _persistCurrentDraft();
-    if (!mounted) return;
+  void _goToPreviousStep() {
+    _persistCurrentDraft();
     if (_currentStep > 1) {
-      final previousStep = _currentStep - 1;
+      final previousStep = _resolvePreviousStep(_currentStep);
       setState(() {
         _currentStep = previousStep;
         _initializedSteps.add(previousStep);
@@ -122,7 +151,11 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {
+              _persistCurrentDraft();
+              if (!dialogContext.mounted) return;
+              Navigator.pop(dialogContext, true);
+            },
             child: const Text('Yes, Leave'),
           ),
         ],
@@ -143,13 +176,7 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
       return false;
     }
 
-    try {
-      await _persistCurrentDraft();
-      debugPrint('✅ Draft persisted on system back exit');
-    } catch (e) {
-      debugPrint('⚠️ Error persisting draft on system back exit: $e');
-    }
-
+    _persistCurrentDraft();
     return true;
   }
 
@@ -252,12 +279,7 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
 
     if (shouldExit != true || !mounted) return;
 
-    try {
-      await _persistCurrentDraft();
-      debugPrint('✅ Draft persisted on profiling exit');
-    } catch (e) {
-      debugPrint('⚠️ Error persisting draft on profiling exit: $e');
-    }
+    _persistCurrentDraft();
     if (!mounted) return;
     Navigator.pop(context);
   }
@@ -450,6 +472,7 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
 
     try {
       _currentData.status = 'Unsync';
+      _currentData.draftStep = null;
       // Save locally only (do NOT auto-sync to Firestore). Keep setAsCurrent=false
       // so this saved profile is treated as an Unsync entry and not the current in-progress draft.
       await _storage.saveDraftLocally(_currentData, setAsCurrent: false);
@@ -467,24 +490,21 @@ class _ProfilingFlowState extends State<ProfilingFlow> {
           ),
           actions: [
             TextButton(
-              onPressed: () async {
+              onPressed: () {
                 Navigator.pop(dialogContext); // Close dialog
-                try {
-                  // Clear only in-progress draft(s) after successful save.
-                  await _storage.deleteDraftLocally();
-                  debugPrint('✅ In-progress draft cleared after submit');
-                } catch (e) {
-                  debugPrint(
-                    '⚠️ Could not clear in-progress draft after submit: $e',
-                  );
-                }
-                // Mark as successfully submitted so dispose() won't delete it
+                // Clear static session so next profiling starts fresh
+                _sessionData = null;
+                _sessionStep = 1;
+                _sessionInitializedSteps = {1};
                 _formSubmittedSuccessfully = true;
                 // Reset form for new entry and navigate back
                 if (!mounted) return;
                 setState(() {
                   _currentData = ProfilingData();
                   _currentStep = 1;
+                  _initializedSteps
+                    ..clear()
+                    ..add(1);
                 });
                 if (!mounted) return;
                 Navigator.pop(context); // Go back to previous screen
@@ -830,7 +850,7 @@ class _ProfilingStepWrapperState extends State<ProfilingStepWrapper>
                   ),
                 ),
                 child: Scrollbar(
-                  thumbVisibility: true,
+                  thumbVisibility: false,
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: EdgeInsets.symmetric(horizontal: contentHPad),

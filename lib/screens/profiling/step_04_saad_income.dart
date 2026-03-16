@@ -6,6 +6,7 @@ import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 import 'package:da_project_1/services/local_commodity_cache.dart';
 import 'package:da_project_1/services/commodity_service.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 4 of 10 — SAAD Commodity Type
 /// Fields: Commodity Type (dropdown)
@@ -69,6 +70,7 @@ class _CommodityForm {
 }
 
 class _Step04SAAdIncomeState extends State<Step04SAAdIncome> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   String? _selectedType;
   String? _selectedCommodity;
   String? _selectedSaleMeth;
@@ -530,7 +532,14 @@ class _Step04SAAdIncomeState extends State<Step04SAAdIncome> {
   }
 
   @override
+  void deactivate() {
+    _autoSaveToCurrentData();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _autoSaveToCurrentData();
     _maleCountCtrl.dispose();
     _femaleCountCtrl.dispose();
     _weightCtrl.dispose();

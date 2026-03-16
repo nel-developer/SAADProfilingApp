@@ -4,6 +4,7 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 9 of 10 — Monthly Family Income
 ///
@@ -30,6 +31,7 @@ class Step09MonthlyIncome extends StatefulWidget {
 }
 
 class _Step09MonthlyIncomeState extends State<Step09MonthlyIncome> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   final TextEditingController _agriRelatedCtrl = TextEditingController();
   final TextEditingController _saadNetCtrl = TextEditingController();
   final TextEditingController _nonSAADNetCtrl = TextEditingController();

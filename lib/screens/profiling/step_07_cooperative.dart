@@ -4,6 +4,7 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 7 — Farmers/Fishers Cooperative
 class Step07Cooperative extends StatefulWidget {
@@ -25,9 +26,11 @@ class Step07Cooperative extends StatefulWidget {
 }
 
 class _Step07CooperativeState extends State<Step07Cooperative> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   final TextEditingController _organizationCtrl = TextEditingController();
   final TextEditingController _membershipDateCtrl = TextEditingController();
   final TextEditingController _positionOtherCtrl = TextEditingController();
+  bool _hasOrganization = false;
   String? _selectedPosition;
   static const List<String> _positionOptions = <String>[
     'President',
@@ -71,6 +74,16 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
     _organizationCtrl.text = data.cooperativeName ?? '';
     _membershipDateCtrl.text = data.dateOfMembership ?? '';
     _forceUppercase(_organizationCtrl);
+    _hasOrganization = data.hasOrganization == true;
+
+    // Legacy compatibility: treat existing cooperative details as "Yes".
+    if (!_hasOrganization &&
+        (_organizationCtrl.text.trim().isNotEmpty ||
+            (data.cooperativePosition ?? '').trim().isNotEmpty ||
+            _membershipDateCtrl.text.trim().isNotEmpty ||
+            (data.cooperativePositionOthers ?? '').trim().isNotEmpty)) {
+      _hasOrganization = true;
+    }
 
     final rawPosition = (data.cooperativePosition ?? '').trim();
     final normalized = _normalizePosition(rawPosition);
@@ -105,13 +118,18 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
     final data = widget.currentData;
     if (data == null) return;
 
-    final organization = _organizationCtrl.text.trim().toUpperCase();
-    final position = _selectedPosition?.trim() ?? '';
-    final membershipDate = _membershipDateCtrl.text.trim();
-    final positionOther = position == 'Other'
+    final organization = _hasOrganization
+        ? _organizationCtrl.text.trim().toUpperCase()
+        : '';
+    final position = _hasOrganization ? (_selectedPosition?.trim() ?? '') : '';
+    final membershipDate = _hasOrganization
+        ? _membershipDateCtrl.text.trim()
+        : '';
+    final positionOther = (_hasOrganization && position == 'Other')
         ? _positionOtherCtrl.text.trim().toUpperCase()
         : '';
 
+    data.hasOrganization = _hasOrganization;
     data.cooperativeName = organization;
     data.cooperativePosition = position;
     data.dateOfMembership = membershipDate;
@@ -127,6 +145,7 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
 
       all[selectedYear] = {
         ...existingYear,
+        'hasOrganization': _hasOrganization,
         'cooperativeName': organization,
         'cooperativePosition': position,
         'dateOfMembership': membershipDate,
@@ -135,6 +154,12 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
 
       data.recurrenceByYear = all;
     }
+  }
+
+  @override
+  void deactivate() {
+    _autoSaveToCurrentData();
+    super.deactivate();
   }
 
   @override
@@ -158,6 +183,38 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
     } else {
       widget.onBack();
     }
+  }
+
+  String _formatDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
+  DateTime? _parseDate(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return DateTime.tryParse(trimmed);
+  }
+
+  Future<void> _pickMembershipDate() async {
+    FocusScope.of(context).unfocus();
+    final now = DateTime.now();
+    final initial = _parseDate(_membershipDateCtrl.text) ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(now.year + 1, 12, 31),
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _membershipDateCtrl.text = _formatDate(picked);
+      _autoSaveToCurrentData();
+    });
   }
 
   @override
@@ -192,64 +249,98 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _label('Organization Name', labelSize),
+          _label('Do you have an organization?', labelSize),
           SizedBox(height: labelFieldGap),
-          SizedBox(
-            height: fieldHeight,
-            child: _shadowedField(
-              controller: _organizationCtrl,
-              hint: 'Enter organization name',
-            ),
+          _yesNoOption(
+            label: 'Yes',
+            selected: _hasOrganization,
+            fontSize: labelSize - 1,
+            onTap: () {
+              setState(() {
+                _hasOrganization = true;
+                _autoSaveToCurrentData();
+              });
+            },
+          ),
+          _yesNoOption(
+            label: 'No',
+            selected: !_hasOrganization,
+            fontSize: labelSize - 1,
+            onTap: () {
+              setState(() {
+                _hasOrganization = false;
+                _organizationCtrl.clear();
+                _membershipDateCtrl.clear();
+                _positionOtherCtrl.clear();
+                _selectedPosition = null;
+                _autoSaveToCurrentData();
+              });
+            },
           ),
 
-          SizedBox(height: fieldGap),
-
-          _label('Position', labelSize),
-          SizedBox(height: labelFieldGap),
-          Column(
-            children: _positionOptions.map((option) {
-              final isSelected = _selectedPosition == option;
-              return _checkboxOption(
-                label: option,
-                selected: isSelected,
-                fontSize: labelSize - 1,
-                onTap: () {
-                  setState(() {
-                    _selectedPosition = option;
-                    if (option != 'Other') {
-                      _positionOtherCtrl.clear();
-                    }
-                    _autoSaveToCurrentData();
-                  });
-                },
-              );
-            }).toList(),
-          ),
-
-          SizedBox(height: fieldGap),
-
-          _label('Date of Membership', labelSize),
-          SizedBox(height: labelFieldGap),
-          SizedBox(
-            height: fieldHeight,
-            child: _shadowedField(
-              controller: _membershipDateCtrl,
-              hint: 'Enter date of membership',
-            ),
-          ),
-
-          SizedBox(height: fieldGap),
-
-          if (_selectedPosition == 'Other') ...[
-            _label('If Other Position, specify', labelSize),
+          if (_hasOrganization) ...[
+            SizedBox(height: fieldGap),
+            _label('Organization Name', labelSize),
             SizedBox(height: labelFieldGap),
             SizedBox(
               height: fieldHeight,
               child: _shadowedField(
-                controller: _positionOtherCtrl,
-                hint: 'Enter other position',
+                controller: _organizationCtrl,
+                hint: 'Enter organization name',
               ),
             ),
+
+            SizedBox(height: fieldGap),
+
+            _label('Position', labelSize),
+            SizedBox(height: labelFieldGap),
+            Column(
+              children: _positionOptions.map((option) {
+                final isSelected = _selectedPosition == option;
+                return _checkboxOption(
+                  label: option,
+                  selected: isSelected,
+                  fontSize: labelSize - 1,
+                  onTap: () {
+                    setState(() {
+                      _selectedPosition = option;
+                      if (option != 'Other') {
+                        _positionOtherCtrl.clear();
+                      }
+                      _autoSaveToCurrentData();
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+
+            SizedBox(height: fieldGap),
+
+            _label('Date of Membership', labelSize),
+            SizedBox(height: labelFieldGap),
+            SizedBox(
+              height: fieldHeight,
+              child: _shadowedField(
+                controller: _membershipDateCtrl,
+                hint: 'Select date of membership',
+                readOnly: true,
+                onTap: _pickMembershipDate,
+              ),
+            ),
+
+            SizedBox(height: fieldGap),
+
+            if (_selectedPosition == 'Other') ...[
+              _label('If Other Position, specify', labelSize),
+              SizedBox(height: labelFieldGap),
+              SizedBox(
+                height: fieldHeight,
+                child: _shadowedField(
+                  controller: _positionOtherCtrl,
+                  hint: 'Enter other position',
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -270,6 +361,8 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
   Widget _shadowedField({
     required TextEditingController controller,
     required String hint,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -291,7 +384,63 @@ class _Step07CooperativeState extends State<Step07Cooperative> {
       child: CustomTextField(
         controller: controller,
         hintText: hint,
+        readOnly: readOnly,
+        onTap: onTap,
         onChanged: (_) => _autoSaveToCurrentData(),
+      ),
+    );
+  }
+
+  Widget _yesNoOption({
+    required String label,
+    required bool selected,
+    required double fontSize,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? DAColors.primaryGreen
+                      : Colors.grey.shade400,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? Center(
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: DAColors.primaryGreen,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w500,
+                  color: DAColors.black,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

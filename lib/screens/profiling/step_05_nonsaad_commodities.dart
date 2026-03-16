@@ -6,6 +6,7 @@ import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
 import 'package:da_project_1/services/local_commodity_cache.dart';
 import 'package:da_project_1/services/commodity_service.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 5 of 10 — Non-SAAD Commodity Type
 /// Fields: Commodity Type (dropdown)
@@ -70,6 +71,7 @@ class _CommodityForm {
 }
 
 class _Step05NonSAADCommoditiesState extends State<Step05NonSAADCommodities> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   String? _selectedType;
   String? _selectedCommodity;
   String? _selectedSaleMeth;
@@ -525,6 +527,27 @@ class _Step05NonSAADCommoditiesState extends State<Step05NonSAADCommodities> {
     if (!hasInput) {
       _loadData();
     }
+  }
+
+  @override
+  void deactivate() {
+    _autoSaveToCurrentData();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _autoSaveToCurrentData();
+    _maleCountCtrl.dispose();
+    _femaleCountCtrl.dispose();
+    _weightCtrl.dispose();
+    _amountCtrl.dispose();
+    _expensesCtrl.dispose();
+    _remarksCtrl.dispose();
+    for (final f in _additionalForms) {
+      f.dispose();
+    }
+    super.dispose();
   }
 
   void _handleNext() {

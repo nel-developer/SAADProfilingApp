@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 8 of 10 — Farm/Fisheries Income
 ///
@@ -29,6 +30,7 @@ class Step08FarmIncome extends StatefulWidget {
 }
 
 class _Step08FarmIncomeState extends State<Step08FarmIncome> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   // Simplified Non-Farm/Fisheries income: 3 beneficiary rows
   // each row has a multiline income field plus remarks
   final TextEditingController _beneficiaryIncomeCtrl = TextEditingController();

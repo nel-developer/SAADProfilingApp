@@ -4,6 +4,7 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
+import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 3 of 8 — Other Personal Information
 /// Fields: Indigenous Group (Yes/No + Autocomplete), PWD (Yes/No), Marital Status, Spouse Name (if married)
@@ -26,6 +27,7 @@ class Step03OtherPersonal extends StatefulWidget {
 }
 
 class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
+  final ProfilingStorageService _storage = ProfilingStorageService();
   bool? _isIndigenous;
   bool? _isPWD;
   String? _maritalStatus; // 'married', 'single', 'widowed'
@@ -59,8 +61,8 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
   @override
   void didUpdateWidget(Step03OtherPersonal oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload data when returning to this step via back button
-    _loadData();
+    // Keep local in-memory state authoritative while this step widget is alive.
+    // Avoid reloads on parent rebuilds to prevent accidental field resets.
   }
 
   void _loadData() {
@@ -91,7 +93,14 @@ class _Step03OtherPersonalState extends State<Step03OtherPersonal> {
   }
 
   @override
+  void deactivate() {
+    _autoSaveToCurrentData();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _autoSaveToCurrentData();
     _spouseNameCtrl.dispose();
     super.dispose();
   }

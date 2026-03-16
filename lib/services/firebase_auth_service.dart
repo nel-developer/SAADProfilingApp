@@ -8,6 +8,26 @@ class FirebaseAuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Map<String, String> _roleCache = {}; // in-memory cache: uid -> role
 
+  Future<void> _ensureOnlineForAdminWrite() async {
+    try {
+      await _firestore
+          .collection('users')
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+    } on FirebaseException catch (e) {
+      if (e.code == 'unavailable' || e.code == 'deadline-exceeded') {
+        throw Exception(
+          'No internet connection. Account approval/role changes require Firebase online access.',
+        );
+      }
+      rethrow;
+    } catch (_) {
+      throw Exception(
+        'No internet connection. Account approval/role changes require Firebase online access.',
+      );
+    }
+  }
+
   /// Get current user
   User? get currentUser => _firebaseAuth.currentUser;
 
@@ -103,8 +123,9 @@ class FirebaseAuthService {
           final prefs = await SharedPreferences.getInstance();
           final minimal = <String, dynamic>{};
           if (data.containsKey('role')) minimal['role'] = data['role'];
-          if (data.containsKey('accountStatus'))
+          if (data.containsKey('accountStatus')) {
             minimal['accountStatus'] = data['accountStatus'];
+          }
           final firstName = (data['firstName'] ?? '').toString().trim();
           if (firstName.isNotEmpty) minimal['firstName'] = firstName;
           final surname = (data['surname'] ?? data['lastName'] ?? '')
@@ -203,6 +224,8 @@ class FirebaseAuthService {
   /// Roles: 'admin', 'moderator', 'profiler'
   Future<void> assignRole(String uid, String role) async {
     try {
+      await _ensureOnlineForAdminWrite();
+
       // Get current roles
       final userDoc = await _firestore.collection('users').doc(uid).get();
       List<String> roles = List<String>.from(userDoc['roles'] ?? []);
@@ -234,6 +257,8 @@ class FirebaseAuthService {
   /// Approve user and assign role
   Future<void> approveUserWithRole(String uid, String role) async {
     try {
+      await _ensureOnlineForAdminWrite();
+
       await _firestore.collection('users').doc(uid).update({
         'accountStatus': 'approved',
         'role': role,
@@ -248,6 +273,8 @@ class FirebaseAuthService {
   /// Reject user account
   Future<void> rejectUser(String uid, String reason) async {
     try {
+      await _ensureOnlineForAdminWrite();
+
       await _firestore.collection('users').doc(uid).update({
         'accountStatus': 'rejected',
         'rejectionReason': reason,
@@ -352,6 +379,8 @@ class FirebaseAuthService {
   /// Update user role (for already approved accounts)
   Future<void> updateUserRole(String uid, String newRole) async {
     try {
+      await _ensureOnlineForAdminWrite();
+
       await _firestore.collection('users').doc(uid).update({
         'role': newRole,
         'roleUpdatedAt': FieldValue.serverTimestamp(),

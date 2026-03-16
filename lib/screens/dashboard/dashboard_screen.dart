@@ -205,7 +205,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ..._pendingProfiles,
     ];
 
-    final totalBeneficiaries = profiles.length;
+    int totalBeneficiaries = 0;
 
     final uniqueOrgs = <String>{};
     final uniqueCommodityTypes = <String>{};
@@ -224,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     int adultCount = 0;
     int seniorCount = 0;
 
-    int totalMembers = 0;
+    final uniqueMemberKeys = <String>{};
 
     double agriTotal = 0;
     int agriSamples = 0;
@@ -235,9 +235,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final coopName = _asString(profile['cooperativeName']);
       if (coopName.isNotEmpty) uniqueOrgs.add(coopName.toLowerCase());
 
-      final maleMembers = _parseInt(profile['maleFamilyMembers']) ?? 0;
-      final femaleMembers = _parseInt(profile['femaleFamilyMembers']) ?? 0;
-      totalMembers += (maleMembers + femaleMembers);
+      uniqueMemberKeys.add(_profileIdentityKey(profile));
 
       final sex = _asString(profile['sex']).toLowerCase();
       if (sex == 'male' || sex == 'm') {
@@ -294,6 +292,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
     }
 
+    totalBeneficiaries = uniqueMemberKeys.length;
+
     for (final commodity in _commodities) {
       final type = _asString(commodity['type']);
       if (type.isNotEmpty) {
@@ -310,7 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _metrics = DashboardMetrics(
         totalRegisteredOrganizations: uniqueOrgs.length,
         totalSaadBeneficiaries: totalBeneficiaries,
-        totalRegisteredMembers: totalMembers,
+        totalRegisteredMembers: uniqueMemberKeys.length,
         totalMainCommodities: uniqueCommodityTypes.length,
         averageGrossAgriIncome: avgAgri,
         averageGrossNonAgriIncome: avgNonAgri,
@@ -384,6 +384,25 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (beforeBirthday) age--;
     if (age < 0 || age > 120) return null;
     return age;
+  }
+
+  String _profileIdentityKey(Map<String, dynamic> profile) {
+    final saad = _asString(profile['saadIdNo']).toLowerCase();
+    if (saad.isNotEmpty) return 'saad:$saad';
+
+    final firebaseId = _asString(profile['tempIdFirebase']).toLowerCase();
+    if (firebaseId.isNotEmpty) return 'fid:$firebaseId';
+
+    final localId = _asString(profile['tempIdLocal']).toLowerCase();
+    if (localId.isNotEmpty) return 'lid:$localId';
+
+    final first = _asString(profile['firstName']).toLowerCase();
+    final surname = _asString(profile['surname']).toLowerCase();
+    final dob = _asString(profile['dateOfBirth']).toLowerCase();
+    final fallback = '$first|$surname|$dob';
+    if (fallback.replaceAll('|', '').isNotEmpty) return 'name:$fallback';
+
+    return 'unknown:${profile.hashCode}';
   }
 
   String _formatCurrency(double amount) {

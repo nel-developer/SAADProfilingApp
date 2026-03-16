@@ -257,25 +257,6 @@ class _DataViewModalState extends State<DataViewModal> {
                       valueFontSize,
                       scale,
                     ),
-
-                    SizedBox(height: 16 * scale),
-                    SizedBox(height: 12 * scale),
-                    if ((_getProfileData()?.approverEmail ?? '')
-                        .toString()
-                        .isNotEmpty)
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: 4 * scale),
-                          child: Text(
-                            'Approved by: ${_getProfileData()?.approverEmail}${_getProfileData()?.approvedAt != null ? ' on ${_getProfileData()!.approvedAt!.toString().split(' ')[0]}' : ''}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11 * scale,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                      ),
                     _buildSectionTitle('Address', sectionTitleFontSize, scale),
                     _buildInfoRow(
                       'Region:',
@@ -350,6 +331,34 @@ class _DataViewModalState extends State<DataViewModal> {
                       valueFontSize,
                       scale,
                     ),
+                    if ((_getProfileData()?.approverEmail ?? '')
+                        .toString()
+                        .isNotEmpty) ...[
+                      SizedBox(height: 20 * scale),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12 * scale,
+                          vertical: 10 * scale,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Approved by: ${_getProfileData()?.approverEmail}${_getProfileData()?.approvedAt != null ? ' on ${_getProfileData()!.approvedAt!.toString().split(' ')[0]}' : ''}',
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11 * scale,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

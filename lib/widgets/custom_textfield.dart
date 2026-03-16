@@ -14,6 +14,7 @@ class CustomTextField extends StatelessWidget {
   final bool obscureText;
   final bool readOnly;
   final TextInputType? keyboardType;
+  final VoidCallback? onTap;
 
   const CustomTextField({
     super.key,
@@ -27,6 +28,7 @@ class CustomTextField extends StatelessWidget {
     this.obscureText = false,
     this.readOnly = false,
     this.keyboardType,
+    this.onTap,
   });
 
   @override
@@ -46,6 +48,7 @@ class CustomTextField extends StatelessWidget {
       child: TextField(
         controller: controller,
         readOnly: readOnly,
+        onTap: onTap,
         obscureText: obscureText,
         keyboardType: keyboardType,
         decoration: InputDecoration(
@@ -55,11 +58,7 @@ class CustomTextField extends StatelessWidget {
             fontSize: 15,
           ),
           prefixIcon: prefixIcon != null
-              ? Icon(
-                  prefixIcon,
-                  color: Colors.grey.shade600,
-                  size: 24,
-                )
+              ? Icon(prefixIcon, color: Colors.grey.shade600, size: 24)
               : null,
           suffixIcon: suffixIcon != null
               ? GestureDetector(

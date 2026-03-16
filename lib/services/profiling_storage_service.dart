@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:da_project_1/services/image_storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Stages emitted during a sync/save operation so the UI can display progress.
 enum SyncStage { preparing, uploading, finalizing }
@@ -85,13 +86,47 @@ class ProfilingStorageService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Connectivity _connectivity = Connectivity();
   final ImageStorageService _imageStorageService = ImageStorageService();
+  Map<String, dynamic>? _inMemoryCurrentDraft;
+  static const String _currentDraftPrefsKey = 'profiling_current_draft_json';
+
+  Future<void> _saveCurrentDraftToPrefs(Map<String, dynamic> payload) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_currentDraftPrefsKey, jsonEncode(payload));
+    } catch (e) {
+      debugPrint('⚠️ Could not save current draft to prefs: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _loadCurrentDraftFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_currentDraftPrefsKey);
+      if (raw == null || raw.trim().isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return null;
+    } catch (e) {
+      debugPrint('⚠️ Could not load current draft from prefs: $e');
+      return null;
+    }
+  }
+
+  Future<void> _clearCurrentDraftFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_currentDraftPrefsKey);
+    } catch (e) {
+      debugPrint('⚠️ Could not clear current draft from prefs: $e');
+    }
+  }
 
   ProfilingStorageService._internal();
 
   factory ProfilingStorageService() {
     return _instance;
   }
-
   String? _normalizeStatus(dynamic rawStatus) {
     final value = rawStatus?.toString().trim();
     if (value == null || value.isEmpty) {
@@ -129,6 +164,60 @@ class ProfilingStorageService {
     }
 
     return value;
+  }
+
+  String _normalizeIdValue(String? raw) {
+    if (raw == null) return '';
+    return raw.replaceAll(RegExp(r'[\s-]+'), '').trim().toLowerCase();
+  }
+
+  Future<String?> _findDuplicateProfileIdentifier({
+    required String? saadIdNo,
+    required String? rsbsaFishrIdNo,
+    String? excludeDocId,
+  }) async {
+    final normalizedSaad = _normalizeIdValue(saadIdNo);
+    final normalizedRsbsa = _normalizeIdValue(rsbsaFishrIdNo);
+
+    if (normalizedSaad.isEmpty && normalizedRsbsa.isEmpty) {
+      return null;
+    }
+
+    Future<String?> scanCollection(String collectionName) async {
+      final snapshot = await _firestore
+          .collection(collectionName)
+          .get(const GetOptions(source: Source.server));
+
+      for (final doc in snapshot.docs) {
+        if (excludeDocId != null && doc.id == excludeDocId) {
+          continue;
+        }
+
+        final payload = doc.data();
+        final docSaad = _normalizeIdValue(payload['saadIdNo']?.toString());
+        final docRsbsa = _normalizeIdValue(
+          payload['rsbsaFishrIdNo']?.toString(),
+        );
+
+        if (normalizedSaad.isNotEmpty && docSaad == normalizedSaad) {
+          return 'SAAD I.D No. already exists.';
+        }
+
+        if (normalizedRsbsa.isNotEmpty && docRsbsa == normalizedRsbsa) {
+          return 'RSBSA/FISHR ID No. already exists.';
+        }
+      }
+
+      return null;
+    }
+
+    final pendingConflict = await scanCollection('profiling_pending');
+    if (pendingConflict != null) return pendingConflict;
+
+    final approvedConflict = await scanCollection('profiling_forms');
+    if (approvedConflict != null) return approvedConflict;
+
+    return null;
   }
 
   String? _readFirstString(Map<String, dynamic> json, List<String> keys) {
@@ -172,8 +261,84 @@ class ProfilingStorageService {
   }
 
   bool _isInProgressDraft(ProfilingData data) {
-    final status = data.status?.trim();
-    return status == null || status.isEmpty || status == 'Draft';
+    final status = data.status?.trim().toLowerCase();
+    final isExplicitDraft =
+        status == null || status.isEmpty || status == 'draft';
+    if (isExplicitDraft) return true;
+
+    // Additional guard: treat records with a draft step as in-progress unless
+    // they are clearly finalized/synced statuses.
+    final hasDraftStep = (data.draftStep ?? 0) > 0;
+    final isFinalizedStatus =
+        status == 'unsync' ||
+        status == 'approved' ||
+        status == 'pending approval' ||
+        status == 'pending';
+    return hasDraftStep && !isFinalizedStatus;
+  }
+
+  bool _hasMeaningfulInput(ProfilingData data) {
+    final payload = _profilingDataToJson(data);
+    const systemKeys = {
+      'status',
+      'createdAt',
+      'updatedAt',
+      'tempIdLocal',
+      'tempIdFirebase',
+      'draftStep',
+      'userId',
+      'farmerFolderName',
+    };
+
+    bool hasValue(dynamic value) {
+      if (value == null) return false;
+      if (value is String) return value.trim().isNotEmpty;
+      if (value is bool) return true;
+      if (value is num) return true;
+      if (value is List) return value.isNotEmpty;
+      if (value is Map) return value.isNotEmpty;
+      return true;
+    }
+
+    for (final entry in payload.entries) {
+      if (systemKeys.contains(entry.key)) continue;
+      if (hasValue(entry.value)) return true;
+    }
+
+    return data.signatureImage != null;
+  }
+
+  int _draftCompletenessScore(ProfilingData data) {
+    final payload = _profilingDataToJson(data);
+    const systemKeys = {
+      'status',
+      'createdAt',
+      'updatedAt',
+      'tempIdLocal',
+      'tempIdFirebase',
+      'draftStep',
+      'userId',
+      'farmerFolderName',
+    };
+
+    bool hasValue(dynamic value) {
+      if (value == null) return false;
+      if (value is String) return value.trim().isNotEmpty;
+      if (value is bool) return true;
+      if (value is num) return true;
+      if (value is List) return value.isNotEmpty;
+      if (value is Map) return value.isNotEmpty;
+      return true;
+    }
+
+    var score = 0;
+    for (final entry in payload.entries) {
+      if (systemKeys.contains(entry.key)) continue;
+      if (hasValue(entry.value)) score++;
+    }
+
+    if (data.signatureImage != null) score++;
+    return score;
   }
 
   /// Initialize (disk-only, no Hive needed)
@@ -215,11 +380,10 @@ class ProfilingStorageService {
           ? 'profiling'
           : data.surname!.trim();
 
-      final expectedPrefix =
-          '${firstName.replaceAll(' ', '_').toLowerCase()}_${surname.replaceAll(' ', '_').toLowerCase()}_';
       final currentFolder = data.farmerFolderName?.trim() ?? '';
-      final shouldRegenerateFolder =
-          currentFolder.isEmpty || !currentFolder.startsWith(expectedPrefix);
+      // Keep the same folder once it is assigned so typing name changes
+      // does not create duplicate local records/folders.
+      final shouldRegenerateFolder = currentFolder.isEmpty;
 
       if (shouldRegenerateFolder) {
         data.farmerFolderName = _imageStorageService.generateFarmerFolderName(
@@ -229,16 +393,32 @@ class ProfilingStorageService {
         );
       }
 
+      final payload = _profilingDataToJson(data);
+
+      if (setAsCurrent) {
+        _inMemoryCurrentDraft = payload;
+        await _saveCurrentDraftToPrefs(payload);
+      }
+
       // Save to disk (only storage)
       await _imageStorageService.saveDraftJson(
         data.farmerFolderName!,
-        _profilingDataToJson(data),
+        payload,
         firstName: firstName,
         lastName: surname,
       );
 
       debugPrint('✅ Draft saved to disk: ${data.farmerFolderName}');
     } catch (e) {
+      final unsupported =
+          e is UnsupportedError ||
+          e.toString().contains('Platform._operatingSystem');
+      if (unsupported && setAsCurrent) {
+        debugPrint(
+          '⚠️ Disk draft save not supported on this platform; using memory/prefs fallback.',
+        );
+        return;
+      }
       debugPrint('❌ Error saving draft locally: $e');
       rethrow;
     }
@@ -249,14 +429,73 @@ class ProfilingStorageService {
   /// Returns the most recently modified draft JSON file
   Future<ProfilingData?> loadDraftLocally() async {
     try {
-      final drafts = await loadDraftsFromDiskOnly();
-      if (drafts.isEmpty) return null;
-      // Return most recent in-progress draft only (exclude submitted/unsync).
-      for (final draft in drafts) {
-        if (_isInProgressDraft(draft)) {
-          return draft;
-        }
+      ({ProfilingData data, Map<String, dynamic>? raw})? currentCandidate;
+
+      if (_inMemoryCurrentDraft != null) {
+        try {
+          final memoryDraft = _jsonToProfilingData(_inMemoryCurrentDraft!);
+          if (_isInProgressDraft(memoryDraft) &&
+              _hasMeaningfulInput(memoryDraft)) {
+            currentCandidate = (data: memoryDraft, raw: _inMemoryCurrentDraft);
+          }
+        } catch (_) {}
       }
+
+      final prefsDraft = await _loadCurrentDraftFromPrefs();
+      if (prefsDraft != null) {
+        try {
+          final parsed = _jsonToProfilingData(prefsDraft);
+          if (_isInProgressDraft(parsed) && _hasMeaningfulInput(parsed)) {
+            if (currentCandidate == null ||
+                (parsed.updatedAt ?? DateTime(1970)).isAfter(
+                  currentCandidate!.data.updatedAt ?? DateTime(1970),
+                )) {
+              currentCandidate = (data: parsed, raw: prefsDraft);
+            }
+          }
+        } catch (_) {}
+      }
+
+      // If we have a valid current draft pointer, always restore it first.
+      if (currentCandidate != null) {
+        final bestPayload =
+            currentCandidate!.raw ??
+            _profilingDataToJson(currentCandidate!.data);
+        _inMemoryCurrentDraft = bestPayload;
+        await _saveCurrentDraftToPrefs(bestPayload);
+        return currentCandidate!.data;
+      }
+
+      final candidates = <({ProfilingData data, Map<String, dynamic>? raw})>[];
+
+      final drafts = await loadDraftsFromDiskOnly();
+      final inProgress = drafts
+          .where(
+            (draft) => _isInProgressDraft(draft) && _hasMeaningfulInput(draft),
+          )
+          .toList();
+      for (final draft in inProgress) {
+        candidates.add((data: draft, raw: null));
+      }
+
+      if (candidates.isNotEmpty) {
+        candidates.sort((a, b) {
+          final scoreDiff =
+              _draftCompletenessScore(b.data) - _draftCompletenessScore(a.data);
+          if (scoreDiff != 0) return scoreDiff;
+          return (b.data.updatedAt ?? DateTime(1970)).compareTo(
+            a.data.updatedAt ?? DateTime(1970),
+          );
+        });
+
+        final best = candidates.first;
+        final bestPayload = best.raw ?? _profilingDataToJson(best.data);
+        _inMemoryCurrentDraft = bestPayload;
+        await _saveCurrentDraftToPrefs(bestPayload);
+        return best.data;
+      }
+
+      // No meaningful in-progress draft found.
       return null;
     } catch (e) {
       debugPrint('❌ Error loading draft: $e');
@@ -272,56 +511,13 @@ class ProfilingStorageService {
   }
 
   /// Delete local current draft
-  /// This removes the draft JSON file from disk
+  /// This only clears current-draft pointers.
+  /// It intentionally does NOT delete farmer folders/files to keep images safe.
   Future<void> deleteDraftLocally() async {
     try {
-      // Delete only folders that contain draft-only records.
-      // If a folder also contains Unsync/Pending/Approved JSON, keep it.
-      final drafts = await loadDraftsFromDiskOnly();
-      final Map<String, List<ProfilingData>> byFolder = {};
-      for (final draft in drafts) {
-        final folder = draft.farmerFolderName?.trim();
-        if (folder == null || folder.isEmpty) continue;
-        byFolder.putIfAbsent(folder, () => <ProfilingData>[]).add(draft);
-      }
-
-      final foldersToDelete = <String>[];
-      byFolder.forEach((folder, records) {
-        final hasNonDraft = records.any(
-          (record) => !_isInProgressDraft(record),
-        );
-        if (!hasNonDraft) {
-          foldersToDelete.add(folder);
-        }
-      });
-
-      for (final folder in foldersToDelete) {
-        // Write an audit record before deleting so deletes are auditable
-        try {
-          final appDir = await _imageStorageService.getAppDirectory();
-          final auditFile = File('${appDir.path}/deletion_audit.log');
-          final record = {
-            'timestamp': DateTime.now().toIso8601String(),
-            'folder': folder,
-            'action': 'deleteDraftLocally',
-            'caller': StackTrace.current
-                .toString()
-                .split('\n')
-                .take(3)
-                .join(' | '),
-          };
-          await auditFile.parent.create(recursive: true);
-          await auditFile.writeAsString(
-            '${record.toString()}\n',
-            mode: FileMode.append,
-          );
-        } catch (e) {
-          debugPrint('⚠️ Could not write deletion audit log: $e');
-        }
-
-        await _imageStorageService.deleteFarmerFolder(folder);
-        debugPrint('✅ Draft-only folder deleted locally: $folder');
-      }
+      _inMemoryCurrentDraft = null;
+      await _clearCurrentDraftFromPrefs();
+      debugPrint('✅ Current draft pointers cleared (files preserved).');
     } catch (e) {
       debugPrint('❌ Error deleting draft: $e');
       rethrow;
@@ -331,6 +527,8 @@ class ProfilingStorageService {
   /// Clear current draft (no-op for disk-only storage, kept for API compatibility)
   Future<void> clearCurrentDraftPointer() async {
     // Disk-only: no pointer to clear, draft is deleted by deleteDraftLocally()
+    _inMemoryCurrentDraft = null;
+    await _clearCurrentDraftFromPrefs();
     debugPrint('✅ Current draft pointer cleared');
   }
 
@@ -438,6 +636,20 @@ class ProfilingStorageService {
   /// Images are stored in device's local storage under the farmer's folder.
   Future<SyncResult> syncToFirestore(ProfilingData data, String userId) async {
     try {
+      final currentStatus = (data.status ?? '').trim().toLowerCase();
+      if (currentStatus == 'pending approval' || currentStatus == 'pending') {
+        return SyncResult.failure(
+          'This profile is already pending approval and cannot be synced again.',
+          code: 'ALREADY_PENDING',
+        );
+      }
+      if (currentStatus == 'approved') {
+        return SyncResult.failure(
+          'This profile is already approved and cannot be synced again.',
+          code: 'ALREADY_APPROVED',
+        );
+      }
+
       final online = await isOnline();
       if (!online) {
         debugPrint('⚠️ Device offline — cannot sync');
@@ -446,28 +658,39 @@ class ProfilingStorageService {
         );
       }
 
-      data.userId = userId;
+      // Work on a detached copy so failed sync attempts never mutate
+      // the in-memory object currently shown by the UI.
+      final workingData = _jsonToProfilingData(_profilingDataToJson(data));
+
+      if (workingData.isExistingFarmer != true) {
+        // New Farmer sync must not reuse Existing Farmer identifiers.
+        workingData.selectedExistingSaadId = null;
+        workingData.saadIdNo = null;
+        workingData.rsbsaFishrIdNo = null;
+      }
+
+      workingData.userId = userId;
 
       // Mark the record as pending approval; do NOT mark as fully synced/approved
-      data.status = 'Pending Approval';
-      data.createdAt ??= DateTime.now();
-      data.updatedAt = DateTime.now();
+      workingData.status = 'Pending Approval';
+      workingData.createdAt ??= DateTime.now();
+      workingData.updatedAt = DateTime.now();
 
       // Use the centralized pending save so we don't accidentally write to the
       // approved/profiling_forms collection. Give the write a reasonable timeout
       // so the UI doesn't hang indefinitely on slow networks.
       try {
         final result = await saveToPendingCollection(
-          data,
+          workingData,
           userId,
         ).timeout(const Duration(seconds: 15));
         if (result.success) {
           debugPrint('✅ Saved to pending collection');
-          return result;
+        } else {
+          debugPrint(
+            '⚠️ Failed to save to pending collection: ${result.errorMessage}',
+          );
         }
-        debugPrint(
-          '⚠️ Failed to save to pending collection: ${result.errorMessage}',
-        );
         return result;
       } on SocketException catch (e) {
         debugPrint('❌ Connection error during sync: $e');
@@ -529,10 +752,6 @@ class ProfilingStorageService {
           code: 'MISSING_SAAD_ID',
         );
       }
-
-      // Keep fields aligned with the target existing profile selected in Step 1.
-      data.saadIdNo = saadId;
-      data.selectedExistingSaadId = saadId;
 
       final selectedYear = data.yearCovered?.toString().trim();
       final incomingByYear = Map<String, dynamic>.from(
@@ -701,7 +920,9 @@ class ProfilingStorageService {
       'isIndigenous': data.isIndigenous,
       'indigenousGroup': data.indigenousGroup,
       'isPWD': data.isPWD,
+      'maritalStatus': data.maritalStatus,
       'spouseName': data.spouseName,
+      'tribeEthnicity': data.tribeEthnicity,
       'primaryCommodity': data.primaryCommodity,
       'saadCommodityType': data.saadCommodityType,
       'saadCommodities': data.saadCommodities,
@@ -729,6 +950,7 @@ class ProfilingStorageService {
       'receivedSecondaryCommodity': data.receivedSecondaryCommodity,
       'agriRelatedIncome': data.agriRelatedIncome,
       'saadNetIncome': data.saadNetIncome,
+      'nonSAADNetIncome': data.nonSAADNetIncome,
       'nonAgriRelatedIncome': data.nonAgriRelatedIncome,
       'mainSourcesOfIncome': data.mainSourcesOfIncome,
       // Specific commodity income fields
@@ -749,6 +971,7 @@ class ProfilingStorageService {
       'otherMembersNonFarmIncome': data.otherMembersNonFarmIncome,
       'otherMembersRemarks': data.otherMembersRemarks,
       'cooperativeName': data.cooperativeName,
+      'hasOrganization': data.hasOrganization,
       'cooperativePosition': data.cooperativePosition,
       'dateOfMembership': data.dateOfMembership,
       'cooperativePositionOthers': data.cooperativePositionOthers,
@@ -757,12 +980,16 @@ class ProfilingStorageService {
       'idBackImagePath': data.idBackImagePath,
       'farmerPhotoPath': data.farmerPhotoPath,
       'signatureImagePath': data.signatureImagePath,
+      'signatureImageBase64': data.signatureImage == null
+          ? null
+          : base64Encode(data.signatureImage!),
       'farmerFolderName': data.farmerFolderName,
       'userId': data.userId,
       'tempIdLocal': data.tempIdLocal,
       'tempIdFirebase': data.tempIdFirebase,
       'createdAt': data.createdAt?.toIso8601String(),
       'updatedAt': data.updatedAt?.toIso8601String(),
+      'draftStep': data.draftStep,
       'status': data.status,
     };
   }
@@ -770,12 +997,27 @@ class ProfilingStorageService {
   /// Convert JSON to ProfilingData
   ProfilingData _jsonToProfilingData(Map<String, dynamic> json) {
     return ProfilingData(
-      firstName: _readFirstString(json, const ['firstName', 'givenName']),
-      middleName: _readFirstString(json, const ['middleName']),
+      firstName: _readFirstString(json, const [
+        'firstName',
+        'givenName',
+        'firstname',
+        'first_name',
+        'first name',
+      ]),
+      middleName: _readFirstString(json, const [
+        'middleName',
+        'middlename',
+        'middle_name',
+        'middle name',
+      ]),
       surname: _readFirstString(json, const [
         'surname',
         'lastName',
         'lastname',
+        'last_name',
+        'last name',
+        'familyName',
+        'family_name',
         'surName',
       ]),
       extensionName: _readFirstString(json, const ['extensionName']),
@@ -798,6 +1040,7 @@ class ProfilingStorageService {
       isIndigenous: json['isIndigenous'],
       indigenousGroup: json['indigenousGroup'],
       isPWD: json['isPWD'],
+      maritalStatus: json['maritalStatus'],
       spouseName: json['spouseName'],
       tribeEthnicity: json['tribeEthnicity'],
       saadCommodityType: json['saadCommodityType'],
@@ -859,6 +1102,11 @@ class ProfilingStorageService {
       idBackImagePath: json['idBackImagePath'],
       farmerPhotoPath: json['farmerPhotoPath'],
       signatureImagePath: json['signatureImagePath'],
+      signatureImage:
+          (json['signatureImageBase64'] is String &&
+              (json['signatureImageBase64'] as String).isNotEmpty)
+          ? base64Decode(json['signatureImageBase64'] as String)
+          : null,
       farmerFolderName: json['farmerFolderName'],
       userId: json['userId'],
       tempIdLocal: json['tempIdLocal'],
@@ -869,6 +1117,9 @@ class ProfilingStorageService {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : null,
+      draftStep: json['draftStep'] is int
+          ? json['draftStep'] as int
+          : int.tryParse(json['draftStep']?.toString() ?? ''),
       status: _normalizeStatus(json['status']),
       enumeratorEmail: json['enumeratorEmail'],
       approverEmail: json['approvedBy'] ?? json['approverEmail'],
@@ -876,6 +1127,7 @@ class ProfilingStorageService {
           ? DateTime.tryParse(json['approvedAt'])
           : null,
       cooperativeName: json['cooperativeName'],
+      hasOrganization: json['hasOrganization'] == true,
       cooperativePosition: json['cooperativePosition'],
       dateOfMembership: json['dateOfMembership'],
       cooperativePositionOthers: json['cooperativePositionOthers'],
@@ -929,11 +1181,87 @@ class ProfilingStorageService {
         }
       }
 
+      // If still no docId, try to find an existing pending doc by identifier
+      // for the same user so re-sync updates instead of failing duplicate check.
+      if (docId == null || docId.isEmpty) {
+        final normalizedSaad = _normalizeIdValue(data.saadIdNo);
+        final normalizedRsbsa = _normalizeIdValue(data.rsbsaFishrIdNo);
+
+        Future<String?> findMatchingPendingByField(
+          String field,
+          String value,
+        ) async {
+          if (value.isEmpty) return null;
+
+          try {
+            final query = await _firestore
+                .collection('profiling_pending')
+                .where(field, isEqualTo: value)
+                .limit(5)
+                .get()
+                .timeout(const Duration(seconds: 10));
+
+            for (final doc in query.docs) {
+              final payload = doc.data();
+              final docUserId = payload['userId']?.toString().trim() ?? '';
+              final docStatus =
+                  payload['status']?.toString().trim().toLowerCase() ?? '';
+
+              // Reuse only this user's pending draft-like records.
+              if (docUserId == userId &&
+                  (docStatus == 'pending approval' || docStatus == 'pending')) {
+                return doc.id;
+              }
+            }
+          } on FirebaseException catch (e) {
+            debugPrint(
+              '⚠️ Warning: Could not query pending by $field: ${e.code} - ${e.message}',
+            );
+          }
+
+          return null;
+        }
+
+        String? matchedDocId;
+        if (normalizedSaad.isNotEmpty) {
+          matchedDocId = await findMatchingPendingByField(
+            'saadIdNo',
+            data.saadIdNo?.trim() ?? '',
+          );
+        }
+        if ((matchedDocId == null || matchedDocId.isEmpty) &&
+            normalizedRsbsa.isNotEmpty) {
+          matchedDocId = await findMatchingPendingByField(
+            'rsbsaFishrIdNo',
+            data.rsbsaFishrIdNo?.trim() ?? '',
+          );
+        }
+
+        if (matchedDocId != null && matchedDocId.isNotEmpty) {
+          docId = matchedDocId;
+          debugPrint(
+            '✅ Reusing existing pending doc by identifier for same user: $docId',
+          );
+        }
+      }
+
       // If still no docId, create a new one
       if (docId == null || docId.isEmpty) {
         final newDocRef = _firestore.collection('profiling_pending').doc();
         docId = newDocRef.id;
         debugPrint('📝 Creating new pending doc with ID: $docId');
+      }
+
+      final duplicateMessage = await _findDuplicateProfileIdentifier(
+        saadIdNo: data.saadIdNo,
+        rsbsaFishrIdNo: data.rsbsaFishrIdNo,
+        excludeDocId: docId,
+      );
+      if (duplicateMessage != null) {
+        return SyncResult.failure(
+          duplicateMessage,
+          code: 'DUPLICATE_PROFILE_IDENTIFIER',
+        );
       }
 
       data.tempIdFirebase = docId;
@@ -1142,6 +1470,18 @@ class ProfilingStorageService {
         return ApprovalResult.failure(
           'SAAD I.D No. is required before approval.',
           code: 'MISSING_SAAD_ID',
+        );
+      }
+
+      final duplicateMessage = await _findDuplicateProfileIdentifier(
+        saadIdNo: data.saadIdNo,
+        rsbsaFishrIdNo: data.rsbsaFishrIdNo,
+        excludeDocId: pendingDocId,
+      );
+      if (duplicateMessage != null) {
+        return ApprovalResult.failure(
+          duplicateMessage,
+          code: 'DUPLICATE_PROFILE_IDENTIFIER',
         );
       }
 

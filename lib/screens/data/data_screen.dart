@@ -53,23 +53,75 @@ class _DataScreenState extends State<DataScreen>
 
   bool _isUnsyncLocalRecord(ProfilingData data) {
     final status = (data.status ?? '').trim().toLowerCase();
+
+    // In-progress drafts (status == 'draft' or empty with no explicit unsync
+    // marker) are mid-profiling saves — they must NOT appear in the Unsync tab.
+    // They exist only so the profiling flow can restore typed fields on reopen.
+    // A record only enters the Unsync tab after the user fully completes and
+    // submits the profiling form, at which point status is set to 'Unsync'.
     if (status.isEmpty || status == 'draft') {
       return false;
     }
 
-    // Keep Unsync tab resilient for legacy/local variants after app restarts.
+    // Only explicitly finalized-but-unsynced records belong in the Unsync tab.
     if (status == 'unsync' || status == 'unsynced') {
       return true;
     }
 
-    // Exclude cloud workflow states from local Unsync tab.
+    // Exclude cloud workflow states.
     if (status == 'pending approval' ||
         status == 'pending' ||
         status == 'approved') {
       return false;
     }
 
-    return true;
+    return false;
+  }
+
+  String _unsyncIdentityKey(ProfilingData data) {
+    final firebaseId = (data.tempIdFirebase ?? '').trim();
+    if (firebaseId.isNotEmpty) return 'firebase:$firebaseId';
+
+    final localId = (data.tempIdLocal ?? '').trim();
+    if (localId.isNotEmpty) return 'local:$localId';
+
+    final folder = (data.farmerFolderName ?? '').trim();
+    if (folder.isNotEmpty) return 'folder:$folder';
+
+    final saad = (data.saadIdNo ?? '').trim().toLowerCase();
+    final rsbsa = (data.rsbsaFishrIdNo ?? '').trim().toLowerCase();
+    final first = (data.firstName ?? '').trim().toLowerCase();
+    final middle = (data.middleName ?? '').trim().toLowerCase();
+    final surname = (data.surname ?? '').trim().toLowerCase();
+    final dob = (data.dateOfBirth ?? '').trim().toLowerCase();
+    return 'fallback:$saad|$rsbsa|$first|$middle|$surname|$dob';
+  }
+
+  List<ProfilingData> _dedupeUnsyncDrafts(List<ProfilingData> drafts) {
+    final deduped = <String, ProfilingData>{};
+
+    for (final draft in drafts) {
+      final key = _unsyncIdentityKey(draft);
+      final current = deduped[key];
+      if (current == null) {
+        deduped[key] = draft;
+        continue;
+      }
+
+      final currentUpdated = current.updatedAt ?? DateTime(1970);
+      final candidateUpdated = draft.updatedAt ?? DateTime(1970);
+      if (candidateUpdated.isAfter(currentUpdated)) {
+        deduped[key] = draft;
+      }
+    }
+
+    final result = deduped.values.toList();
+    result.sort(
+      (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
+        a.updatedAt ?? DateTime(1970),
+      ),
+    );
+    return result;
   }
 
   bool _asSuccess(dynamic result) {
@@ -405,13 +457,15 @@ class _DataScreenState extends State<DataScreen>
         try {
           final diskDrafts = await _storage.loadDraftsFromDiskOnly();
           final unsyncDrafts = diskDrafts.where(_isUnsyncLocalRecord).toList();
+          final dedupedUnsyncDrafts = _dedupeUnsyncDrafts(unsyncDrafts);
           debugPrint(
-            '✅ Loaded ${unsyncDrafts.length} local Unsync profile(s) from disk',
+            '✅ Loaded ${unsyncDrafts.length} local Unsync profile(s) from disk; '
+            'showing ${dedupedUnsyncDrafts.length} after dedupe',
           );
 
           if (mounted) {
             setState(() {
-              _unsyncData = unsyncDrafts.map(_buildDataMap).toList();
+              _unsyncData = dedupedUnsyncDrafts.map(_buildDataMap).toList();
             });
           }
           debugPrint(
@@ -568,10 +622,26 @@ class _DataScreenState extends State<DataScreen>
       '📝 Draft: ${draft.firstName} ${draft.surname} - Status: $status (dbStatus: ${draft.status})',
     );
 
+    final fullName =
+        '${draft.firstName ?? ''} ${draft.middleName ?? ''} ${draft.surname ?? ''}'
+            .trim();
+    String fallbackName = fullName;
+    if (fallbackName.isEmpty) {
+      final folder = (draft.farmerFolderName ?? '').trim();
+      if (folder.isNotEmpty) {
+        final parts = folder.split('_');
+        if (parts.length >= 3) {
+          fallbackName = '${parts[0]} ${parts[1]}'.toUpperCase();
+        }
+      }
+    }
+    if (fallbackName.isEmpty) {
+      final saad = (draft.saadIdNo ?? '').trim();
+      fallbackName = saad.isNotEmpty ? 'SAAD: $saad' : 'N/A';
+    }
+
     return {
-      'farmerName':
-          '${draft.firstName ?? ''} ${draft.middleName ?? ''} ${draft.surname ?? ''}'
-              .trim(),
+      'farmerName': fallbackName,
       'location': '${draft.municipality ?? ''}, ${draft.province ?? ''}',
       'commodity': draft.primaryCommodity ?? 'N/A',
       'enumerator': draft.enumeratorEmail ?? 'Current User',
@@ -683,6 +753,25 @@ class _DataScreenState extends State<DataScreen>
               }
 
               final profilingData = data['data'] as ProfilingData;
+              final normalizedStatus = (profilingData.status ?? '')
+                  .trim()
+                  .toLowerCase();
+              if (normalizedStatus == 'pending approval' ||
+                  normalizedStatus == 'pending' ||
+                  normalizedStatus == 'approved') {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      normalizedStatus == 'approved'
+                          ? 'This profile is already approved and cannot be synced again.'
+                          : 'This profile is already pending approval and cannot be synced again.',
+                    ),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
 
               // Show loading dialog
               if (!mounted) return;
@@ -692,6 +781,7 @@ class _DataScreenState extends State<DataScreen>
                 useRootNavigator: true,
                 builder: (dialogContext) {
                   loadingDialogContext = dialogContext;
+                  loadingDialogShown = true;
                   return AlertDialog(
                     content: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -717,42 +807,30 @@ class _DataScreenState extends State<DataScreen>
                   );
                 },
               );
-              loadingDialogShown = true;
 
               try {
                 final bool isExistingFarmer =
                     profilingData.isExistingFarmer == true;
-                final syncResult = isExistingFarmer
-                    ? await _storage.syncExistingRecurrenceToApproved(
-                        profilingData,
-                        user.uid,
-                      )
-                    : await _storage.syncToFirestore(profilingData, user.uid);
+                final syncResult =
+                    await (isExistingFarmer
+                            ? _storage.syncExistingRecurrenceToApproved(
+                                profilingData,
+                                user.uid,
+                              )
+                            : _storage.syncToFirestore(profilingData, user.uid))
+                        .timeout(const Duration(seconds: 30));
                 final bool success = _asSuccess(syncResult);
 
                 if (!mounted) return;
-                if (loadingDialogShown &&
-                    loadingDialogContext != null &&
-                    Navigator.of(
-                      loadingDialogContext!,
-                      rootNavigator: true,
-                    ).canPop()) {
-                  Navigator.of(
-                    loadingDialogContext!,
-                    rootNavigator: true,
-                  ).pop();
-                  loadingDialogShown = false;
-                  loadingDialogContext = null;
-                }
 
                 if (success) {
-                  if (isExistingFarmer) {
-                    profilingData.status = 'Approved';
-                    await _storage.saveDraftLocally(
-                      profilingData,
-                      setAsCurrent: false,
-                    );
-                  }
+                  profilingData.status = isExistingFarmer
+                      ? 'Approved'
+                      : 'Pending Approval';
+                  await _storage.saveDraftLocally(
+                    profilingData,
+                    setAsCurrent: false,
+                  );
 
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop(); // Close the modal
@@ -776,40 +854,48 @@ class _DataScreenState extends State<DataScreen>
                     } else if (_selectedFilter == 'Unsync') {
                       await _loadProfilingData();
                     }
+                    await _loadPendingProfiles();
                     if (isExistingFarmer) {
                       await _loadApprovedProfiles();
                     }
                   }
                 } else {
                   if (!mounted) return;
+                  String errorMessage = 'Sync failed. Check your connection.';
+                  try {
+                    final dynamic result = syncResult;
+                    final message = result?.errorMessage?.toString();
+                    if (message != null && message.trim().isNotEmpty) {
+                      errorMessage = message.trim();
+                    }
+                  } catch (_) {}
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('❌ Sync failed. Check your connection.'),
+                    SnackBar(
+                      content: Text('❌ $errorMessage'),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
               } on TimeoutException {
                 if (!mounted) return;
-                if (loadingDialogShown &&
-                    loadingDialogContext != null &&
-                    Navigator.of(
-                      loadingDialogContext!,
-                      rootNavigator: true,
-                    ).canPop()) {
-                  Navigator.of(
-                    loadingDialogContext!,
-                    rootNavigator: true,
-                  ).pop();
-                  loadingDialogShown = false;
-                  loadingDialogContext = null;
-                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('⏱️ Sync taking too long. Try again.'),
                     backgroundColor: Colors.orange,
                   ),
                 );
+              } finally {
+                if (loadingDialogShown && loadingDialogContext != null) {
+                  final navigator = Navigator.of(
+                    loadingDialogContext!,
+                    rootNavigator: true,
+                  );
+                  if (navigator.canPop()) {
+                    navigator.pop();
+                  }
+                  loadingDialogShown = false;
+                  loadingDialogContext = null;
+                }
               }
             } catch (e) {
               if (!mounted) return;
