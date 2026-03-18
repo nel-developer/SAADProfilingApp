@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -44,13 +45,12 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBqIt5CBrO0iuryOr10rkuYRWkKASIzhvM',
-    appId: '1:221749572081:ios:YOUR_IOS_APP_ID',
+    apiKey: 'AIzaSyCj8eI2MH-cyEYfhc0yl-UMZKtGE13Mxn4',
+    appId: '1:221749572081:ios:26ce19781a849d9b4c1450',
     messagingSenderId: '221749572081',
     projectId: 'da-saad-profiling',
     storageBucket: 'da-saad-profiling.firebasestorage.app',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    iosBundleId: 'YOUR_IOS_BUNDLE_ID',
+    iosBundleId: 'com.example.daProject1',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
