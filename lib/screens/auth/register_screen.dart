@@ -71,51 +71,51 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     _firstNameSlideAnim =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.28, 0.45, curve: Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.28, 0.45, curve: Curves.easeOut),
+          ),
+        );
 
     _middleNameSlideAnim =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.35, 0.52, curve: Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.35, 0.52, curve: Curves.easeOut),
+          ),
+        );
 
     _lastNameSlideAnim =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.42, 0.59, curve: Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.42, 0.59, curve: Curves.easeOut),
+          ),
+        );
 
     _emailSlideAnim =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.49, 0.66, curve: Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.49, 0.66, curve: Curves.easeOut),
+          ),
+        );
 
     _passwordSlideAnim =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.56, 0.73, curve: Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.56, 0.73, curve: Curves.easeOut),
+          ),
+        );
 
     _buttonSlideAnim =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.65, 0.82, curve: Curves.easeOut),
-      ),
-    );
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.65, 0.82, curve: Curves.easeOut),
+          ),
+        );
 
     _bottomOpacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
@@ -139,10 +139,14 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   double _scale(BuildContext context) {
-    final scaleW =
-        (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
-    final scaleH =
-        (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
+      0.5,
+      2.0,
+    );
+    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(
+      0.5,
+      2.0,
+    );
     return min(scaleW, scaleH);
   }
 
@@ -165,8 +169,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
 
     // Validate email format
-    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-        .hasMatch(email)) {
+    if (!RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    ).hasMatch(email)) {
       _showErrorDialog('Please enter a valid email address');
       return;
     }
@@ -180,27 +185,16 @@ class _RegisterScreenState extends State<RegisterScreen>
     setState(() => _isLoading = true);
 
     try {
-      // Use timeout to avoid long Firestore writes blocking the UI
-      // If write times out after 1 second, still navigate (write continues in background)
-      await _authService
-          .registerWithEmailPassword(
-            email: email,
-            password: password,
-            firstName: firstName,
-            middleName: middleName,
-            lastName: lastName,
-          )
-          .timeout(const Duration(milliseconds: 1000), onTimeout: () {
-        // Timeout — still move to account under review
-        // (Firestore write continues in background)
-        return null;
-      });
+      await _authService.registerWithEmailPassword(
+        email: email,
+        password: password,
+        firstName: firstName,
+        middleName: middleName,
+        lastName: lastName,
+      );
 
       if (mounted) {
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.accountUnderReview,
-        );
+        Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
       }
     } catch (e) {
       if (mounted) {
@@ -305,9 +299,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
           /// DARK OVERLAY
           Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.15),
-            ),
+            child: Container(color: Colors.black.withOpacity(0.15)),
           ),
 
           /// CONTENT
@@ -315,7 +307,8 @@ class _RegisterScreenState extends State<RegisterScreen>
             child: SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height -
+                  minHeight:
+                      MediaQuery.of(context).size.height -
                       MediaQuery.of(context).padding.top -
                       MediaQuery.of(context).padding.bottom,
                 ),
@@ -365,8 +358,9 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                     /// FORM FIELDS
                     Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: fieldHorizontalPad,
+                      ),
                       child: Column(
                         children: [
                           _buildTextField(
@@ -415,8 +409,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                     SlideTransition(
                       position: _buttonSlideAnim,
                       child: Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: fieldHorizontalPad),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: fieldHorizontalPad,
+                        ),
                         child: SizedBox(
                           width: double.infinity,
                           height: buttonHeight,
@@ -426,7 +421,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                               backgroundColor: DAColors.orange,
                               foregroundColor: DAColors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(buttonRadius),
+                                borderRadius: BorderRadius.circular(
+                                  buttonRadius,
+                                ),
                               ),
                               elevation: 0,
                               padding: EdgeInsets.symmetric(
@@ -479,7 +476,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 padding: EdgeInsets.zero,
                                 onPressed: () {
                                   Navigator.pop(context);
-                                }, minimumSize: Size(0, 0),
+                                },
+                                minimumSize: Size(0, 0),
                                 child: Text(
                                   'Login',
                                   style: GoogleFonts.poppins(

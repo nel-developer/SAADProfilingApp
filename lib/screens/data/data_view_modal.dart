@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/screens/data/data_edit_modal.dart';
 
@@ -69,19 +70,6 @@ class _DataViewModalState extends State<DataViewModal> {
         }
       }
     } catch (_) {}
-
-    // Get the year from yearCovered field
-    final yearCovered = profileData.yearCovered;
-    try {
-      if (yearCovered is int) {
-        years.add(yearCovered);
-      } else if (yearCovered is String && yearCovered.trim().isNotEmpty) {
-        final year = int.tryParse(yearCovered.trim());
-        if (year != null) years.add(year);
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error parsing year: $e');
-    }
 
     if (years.isEmpty) {
       return [DateTime.now().year];
@@ -591,98 +579,61 @@ class _DataViewModalState extends State<DataViewModal> {
       return fallback;
     }
 
-    final maleFamily = scopedText(
-      'maleFamilyMembers',
-      '${profileData?.numberOfMalesInFamily ?? 0}',
-    );
-    final femaleFamily = scopedText(
-      'femaleFamilyMembers',
-      '${profileData?.numberOfFemalesInFamily ?? 0}',
-    );
-    final landTenureship = scopedText(
-      'landTenureship',
-      profileData?.landTenureship ?? 'N/A',
-    );
+    final maleFamily = scopedText('maleFamilyMembers', '0');
+    final femaleFamily = scopedText('femaleFamilyMembers', '0');
+    final landTenureship = scopedText('landTenureship', 'N/A');
     final landTenureshipOthers = scopedText(
       'landTenureshipOthers',
-      profileData?.landTenureshipOthers ?? '___________',
+      '___________',
     );
-    final yearsInFarming = scopedText(
-      'yearsInFarming',
-      '${profileData?.yearsInFarming ?? 0}',
-    );
-    final receivedPrimaryCommodity = scopedFromKeys(
-      ['receivedPrimaryCommodity', 'receivedCommodity', 'primaryCommodity'],
-      (profileData?.receivedPrimaryCommodity ??
-              profileData?.receivedCommodity ??
-              profileData?.primaryCommodity ??
-              'N/A')
-          .toString(),
-    );
-    final receivedSecondaryCommodity = scopedFromKeys(
-      ['receivedSecondaryCommodity', 'secondaryCommodity'],
-      (profileData?.receivedSecondaryCommodity ??
-              profileData?.secondaryCommodity ??
-              'N/A')
-          .toString(),
-    );
-    final primaryCommodity = scopedFromKeys([
+    final yearsInFarming = scopedText('yearsInFarming', '0');
+    final receivedPrimaryCommodity = scopedFromKeys([
+      'receivedPrimaryCommodity',
+      'receivedCommodity',
       'primaryCommodity',
-    ], (profileData?.primaryCommodity ?? 'N/A').toString());
-    final secondaryCommodity = scopedFromKeys([
+    ], 'N/A');
+    final receivedSecondaryCommodity = scopedFromKeys([
+      'receivedSecondaryCommodity',
       'secondaryCommodity',
-    ], (profileData?.secondaryCommodity ?? 'N/A').toString());
+    ], 'N/A');
+    final primaryCommodity = scopedFromKeys(['primaryCommodity'], 'N/A');
+    final secondaryCommodity = scopedFromKeys(['secondaryCommodity'], 'N/A');
     final beneficiaryIncome = scopedFromKeys([
       'beneficiaryNonFarmIncome',
-    ], (profileData?.beneficiaryNonFarmIncome ?? '___________').toString());
-    final beneficiaryRemarks = scopedFromKeys([
-      'beneficiaryRemarks',
-    ], (profileData?.beneficiaryRemarks ?? 'N/A').toString());
-    final spouseIncome = scopedFromKeys([
-      'spouseNonFarmIncome',
-    ], (profileData?.spouseNonFarmIncome ?? '___________').toString());
-    final spouseRemarks = scopedFromKeys([
-      'spouseRemarks',
-    ], (profileData?.spouseRemarks ?? 'N/A').toString());
+    ], '___________');
+    final beneficiaryRemarks = scopedFromKeys(['beneficiaryRemarks'], 'N/A');
+    final spouseIncome = scopedFromKeys(['spouseNonFarmIncome'], '___________');
+    final spouseRemarks = scopedFromKeys(['spouseRemarks'], 'N/A');
     final otherMembersIncome = scopedFromKeys([
       'otherMembersNonFarmIncome',
-    ], (profileData?.otherMembersNonFarmIncome ?? '___________').toString());
-    final otherMembersRemarks = scopedFromKeys([
-      'otherMembersRemarks',
-    ], (profileData?.otherMembersRemarks ?? 'N/A').toString());
-    final nonSaadNetIncome = _resolveNonSaadNetIncome(profileData);
-    final agriRelatedIncome = scopedValueFromKeys([
-      'agriRelatedIncome',
-    ], profileData?.agriRelatedIncome);
-    final saadNetIncome = scopedValueFromKeys([
-      'saadNetIncome',
-    ], profileData?.saadNetIncome);
+    ], '___________');
+    final otherMembersRemarks = scopedFromKeys(['otherMembersRemarks'], 'N/A');
+    final agriRelatedIncome = scopedValueFromKeys(['agriRelatedIncome'], null);
+    final saadNetIncome = scopedValueFromKeys(['saadNetIncome'], null);
     final nonSaadNetIncomeScoped = scopedValueFromKeys([
       'nonSAADNetIncome',
-    ], nonSaadNetIncome);
+    ], null);
     final nonAgriRelatedIncome = scopedValueFromKeys([
       'nonAgriRelatedIncome',
-    ], profileData?.nonAgriRelatedIncome);
-    final mainSourcesOfIncome = scopedFromKeys([
-      'mainSourcesOfIncome',
-    ], profileData?.mainSourcesOfIncome ?? 'N/A');
-    final cooperativeName = scopedFromKeys([
-      'cooperativeName',
-    ], (profileData?.cooperativeName ?? 'N/A').toString());
-    final cooperativePosition = scopedFromKeys([
-      'cooperativePosition',
-    ], (profileData?.cooperativePosition ?? 'N/A').toString());
-    final dateOfMembership = scopedFromKeys([
-      'dateOfMembership',
-    ], (profileData?.dateOfMembership ?? 'N/A').toString());
+    ], null);
+    final mainSourcesOfIncome = scopedFromKeys(['mainSourcesOfIncome'], 'N/A');
+    final cooperativeName = scopedFromKeys(['cooperativeName'], 'N/A');
+    final cooperativePosition = scopedFromKeys(['cooperativePosition'], 'N/A');
+    final dateOfMembership = scopedFromKeys(['dateOfMembership'], 'N/A');
     final cooperativePositionOthers = scopedFromKeys([
       'cooperativePositionOthers',
-    ], (profileData?.cooperativePositionOthers ?? '___________').toString());
+    ], '___________');
+    final primaryRecurrenceOther = scopedFromKeys([
+      'primaryCommodityRecurrenceOthers',
+    ], '');
+    final secondaryRecurrenceOther = scopedFromKeys([
+      'secondaryCommodityRecurrenceOthers',
+    ], '');
     final isOtherCoopPosition =
         cooperativePosition.trim().toLowerCase() == 'other';
-    final saadEntries = _toCommodityEntryList(profileData?.saadCommodities);
+    final saadEntries = _toCommodityEntryList(yearData['saadCommodities']);
     final nonSaadEntries = _toCommodityEntryList(
-      profileData?.nonSAADCommodities,
+      yearData['nonSAADCommodities'],
     );
 
     return Container(
@@ -778,24 +729,18 @@ class _DataViewModalState extends State<DataViewModal> {
                     scale,
                   ),
                   // No remarks are shown for recurrence (no fields exist); if a recurrence-specify field exists
-                  if ((profileData.primaryCommodityRecurrenceOthers ?? '')
-                      .toString()
-                      .isNotEmpty)
+                  if (primaryRecurrenceOther.trim().isNotEmpty)
                     _buildSingleRow(
                       'If Primary Received Other, specify:',
-                      profileData.primaryCommodityRecurrenceOthers ??
-                          '___________',
+                      primaryRecurrenceOther,
                       labelSize - 1 * scale,
                       valueSize - 1 * scale,
                       scale,
                     ),
-                  if ((profileData.secondaryCommodityRecurrenceOthers ?? '')
-                      .toString()
-                      .isNotEmpty)
+                  if (secondaryRecurrenceOther.trim().isNotEmpty)
                     _buildSingleRow(
                       'If Secondary Received Other, specify:',
-                      profileData.secondaryCommodityRecurrenceOthers ??
-                          '___________',
+                      secondaryRecurrenceOther,
                       labelSize - 1 * scale,
                       valueSize - 1 * scale,
                       scale,
@@ -967,12 +912,6 @@ class _DataViewModalState extends State<DataViewModal> {
       }
     }
     return monthlyTotal.roundToDouble();
-  }
-
-  double _resolveNonSaadNetIncome(dynamic profileData) {
-    final stored = _toDouble(profileData?.nonSAADNetIncome);
-    if (stored > 0) return stored;
-    return _calculateMonthlyNetFromEntries(profileData?.nonSAADCommodities);
   }
 
   List<Map<String, dynamic>> _toCommodityEntryList(dynamic entries) {
@@ -1260,39 +1199,95 @@ class _DataViewModalState extends State<DataViewModal> {
       );
     }
 
-    // PENDING: Approve + Edit + Decline
+    // PENDING
     if (widget.dataStatus == 'Pending') {
+      final profileData = _getProfileData();
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      // Admin/Moderator always sees Approve + Decline buttons (onApprove is set by data_screen)
+      // Enumerator-only users see Edit + Sync to allow re-submission
+      final canApprove = widget.onApprove != null;
+
+      if (!canApprove) {
+        // Non-admin enumerator: allow edit and re-sync
+        final isEnumerator =
+            currentUser != null &&
+            profileData?.enumeratorEmail != null &&
+            currentUser.email?.trim().toLowerCase() ==
+                profileData!.enumeratorEmail!.trim().toLowerCase();
+
+        if (isEnumerator) {
+          return Row(
+            children: [
+              Expanded(
+                child: _buildButton(
+                  'Edit',
+                  const Color(0xFF0066CC),
+                  () => _openEditModal(context),
+                  buttonHeight,
+                  buttonFontSize,
+                ),
+              ),
+              SizedBox(width: buttonSpacing),
+              Expanded(
+                child: _buildButton(
+                  'Sync',
+                  DAColors.primaryGreen,
+                  widget.onSync ?? () {},
+                  buttonHeight,
+                  buttonFontSize,
+                ),
+              ),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      }
+
+      // Admin/Moderator: show Approve + Edit + Decline
+      final canAct =
+          widget.onApprove != null ||
+          widget.onDecline != null ||
+          widget.onEdit != null;
+      if (!canAct) return const SizedBox.shrink();
       return Row(
         children: [
-          Expanded(
-            child: _buildButton(
-              'Approve',
-              DAColors.primaryGreen,
-              widget.onApprove ?? () {},
-              buttonHeight,
-              buttonFontSize,
+          if (widget.onApprove != null)
+            ...([
+              Expanded(
+                child: _buildButton(
+                  'Approve',
+                  DAColors.primaryGreen,
+                  widget.onApprove!,
+                  buttonHeight,
+                  buttonFontSize,
+                ),
+              ),
+              SizedBox(width: buttonSpacing),
+            ]),
+          if (widget.onEdit != null)
+            ...([
+              Expanded(
+                child: _buildButton(
+                  'Edit',
+                  const Color(0xFF0066CC),
+                  () => _openEditModal(context),
+                  buttonHeight,
+                  buttonFontSize,
+                ),
+              ),
+              SizedBox(width: buttonSpacing),
+            ]),
+          if (widget.onDecline != null)
+            Expanded(
+              child: _buildButton(
+                'Decline',
+                DAColors.red,
+                widget.onDecline!,
+                buttonHeight,
+                buttonFontSize,
+              ),
             ),
-          ),
-          SizedBox(width: buttonSpacing),
-          Expanded(
-            child: _buildButton(
-              'Edit',
-              const Color(0xFF0066CC),
-              () => _openEditModal(context),
-              buttonHeight,
-              buttonFontSize,
-            ),
-          ),
-          SizedBox(width: buttonSpacing),
-          Expanded(
-            child: _buildButton(
-              'Decline',
-              DAColors.red,
-              widget.onDecline ?? () {},
-              buttonHeight,
-              buttonFontSize,
-            ),
-          ),
         ],
       );
     }

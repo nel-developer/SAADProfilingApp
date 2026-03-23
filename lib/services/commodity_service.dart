@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:da_project_1/models/commodity_data.dart';
 import 'package:da_project_1/services/local_commodity_cache.dart';
@@ -9,12 +10,30 @@ class CommodityService {
   static final CommodityService _instance = CommodityService._internal();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   static const String _collectionName = 'commodities';
 
   CommodityService._internal();
 
   factory CommodityService() {
     return _instance;
+  }
+
+  Future<void> _ensureCommodityAdminAccess() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      throw Exception('No user logged in.');
+    }
+
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+    final role = (userDoc.data()?['role'] as String?)?.toLowerCase();
+
+    if (role != 'admin') {
+      throw Exception('Only admins can manage commodities.');
+    }
   }
 
   List<CommodityData> _defaultCommodityFallback() {
@@ -126,6 +145,7 @@ class CommodityService {
   /// Create a new commodity
   Future<String> addCommodity(CommodityData data) async {
     try {
+      await _ensureCommodityAdminAccess();
       final now = DateTime.now();
       data.createdAt = now;
       data.updatedAt = now;
@@ -227,6 +247,7 @@ class CommodityService {
   /// Update a commodity
   Future<bool> updateCommodity(String docId, CommodityData data) async {
     try {
+      await _ensureCommodityAdminAccess();
       data.updatedAt = DateTime.now();
 
       await _firestore
@@ -244,6 +265,7 @@ class CommodityService {
   /// Delete a commodity
   Future<bool> deleteCommodity(String docId) async {
     try {
+      await _ensureCommodityAdminAccess();
       await _firestore.collection(_collectionName).doc(docId).delete();
       debugPrint('✅ Commodity deleted: $docId');
       return true;
@@ -280,6 +302,7 @@ class CommodityService {
   /// Clear all commodities (admin reset)
   Future<bool> clearAllCommodities() async {
     try {
+      await _ensureCommodityAdminAccess();
       // Delete all from Firestore
       final snapshot = await _firestore.collection(_collectionName).get();
       for (final doc in snapshot.docs) {

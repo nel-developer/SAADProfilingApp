@@ -41,12 +41,7 @@ class AccountCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border(
-          left: BorderSide(
-            color: roleColor,
-            width: 6,
-          ),
-        ),
+        border: Border(left: BorderSide(color: roleColor, width: 6)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.06),
@@ -57,7 +52,9 @@ class AccountCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: isPending ? _buildPendingLayout(context) : _buildActiveLayout(context),
+        child: isPending
+            ? _buildPendingLayout(context)
+            : _buildActiveLayout(context),
       ),
     );
   }
@@ -67,9 +64,21 @@ class AccountCard extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
     final isTablet = width > 600;
     final isLargeTablet = width > 900;
-    final nameFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
-    final emailFontSize = isLargeTablet ? 16.0 : isTablet ? 15.0 : 14.0;
-    final dateFontSize = isLargeTablet ? 14.0 : isTablet ? 13.0 : 12.0;
+    final nameFontSize = isLargeTablet
+        ? 20.0
+        : isTablet
+        ? 18.0
+        : 17.0;
+    final emailFontSize = isLargeTablet
+        ? 16.0
+        : isTablet
+        ? 15.0
+        : 14.0;
+    final dateFontSize = isLargeTablet
+        ? 14.0
+        : isTablet
+        ? 13.0
+        : 12.0;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -101,11 +110,18 @@ class AccountCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.calendar_today, size: isTablet ? 16 : 14, color: Colors.grey.shade500),
+                  Icon(
+                    Icons.calendar_today,
+                    size: isTablet ? 16 : 14,
+                    color: Colors.grey.shade500,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     date,
-                    style: GoogleFonts.poppins(fontSize: dateFontSize, color: Colors.grey.shade500),
+                    style: GoogleFonts.poppins(
+                      fontSize: dateFontSize,
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 ],
               ),
@@ -115,15 +131,29 @@ class AccountCard extends StatelessWidget {
         const SizedBox(width: 12),
 
         /// Accept / Decline
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            PrimaryButton(label: 'Accept', color: DAColors.primaryGreen, onTap: onAccept ?? () {}, isSmall: true),
-            const SizedBox(height: 8),
-            PrimaryButton(label: 'Decline', color: DAColors.red, onTap: onDecline ?? () {}, isSmall: true),
-          ],
-        ),
+        if (onAccept != null || onDecline != null)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (onAccept != null)
+                PrimaryButton(
+                  label: 'Accept',
+                  color: DAColors.primaryGreen,
+                  onTap: onAccept!,
+                  isSmall: true,
+                ),
+              if (onAccept != null && onDecline != null)
+                const SizedBox(height: 8),
+              if (onDecline != null)
+                PrimaryButton(
+                  label: 'Decline',
+                  color: DAColors.red,
+                  onTap: onDecline!,
+                  isSmall: true,
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -133,9 +163,21 @@ class AccountCard extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
     final isTablet = width > 600;
     final isLargeTablet = width > 900;
-    final nameFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 17.0;
-    final emailFontSize = isLargeTablet ? 16.0 : isTablet ? 15.0 : 14.0;
-    final dateFontSize = isLargeTablet ? 14.0 : isTablet ? 13.0 : 12.0;
+    final nameFontSize = isLargeTablet
+        ? 20.0
+        : isTablet
+        ? 18.0
+        : 17.0;
+    final emailFontSize = isLargeTablet
+        ? 16.0
+        : isTablet
+        ? 15.0
+        : 14.0;
+    final dateFontSize = isLargeTablet
+        ? 14.0
+        : isTablet
+        ? 13.0
+        : 12.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,11 +229,18 @@ class AccountCard extends StatelessWidget {
             Expanded(
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today, size: isTablet ? 16 : 14, color: Colors.grey.shade500),
+                  Icon(
+                    Icons.calendar_today,
+                    size: isTablet ? 16 : 14,
+                    color: Colors.grey.shade500,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     date,
-                    style: GoogleFonts.poppins(fontSize: dateFontSize, color: Colors.grey.shade500),
+                    style: GoogleFonts.poppins(
+                      fontSize: dateFontSize,
+                      color: Colors.grey.shade500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -202,15 +251,18 @@ class AccountCard extends StatelessWidget {
             // Status badge + Edit button side by side
             StatusBadge(
               label: status,
-              color: status == 'Active' ? DAColors.primaryGreen : Colors.grey.shade700,
+              color: status == 'Active'
+                  ? DAColors.primaryGreen
+                  : Colors.grey.shade700,
             ),
-            const SizedBox(width: 8),
-            PrimaryButton(
-              label: 'Edit',
-              color: const Color(0xFF00BCD4),
-              onTap: onEdit ?? () {},
-              isSmall: true,
-            ),
+            if (onEdit != null) const SizedBox(width: 8),
+            if (onEdit != null)
+              PrimaryButton(
+                label: 'Edit',
+                color: const Color(0xFF00BCD4),
+                onTap: onEdit!,
+                isSmall: true,
+              ),
           ],
         ),
       ],

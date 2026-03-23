@@ -54,25 +54,21 @@ class _DataScreenState extends State<DataScreen>
   bool _isUnsyncLocalRecord(ProfilingData data) {
     final status = (data.status ?? '').trim().toLowerCase();
 
-    // In-progress drafts (status == 'draft' or empty with no explicit unsync
-    // marker) are mid-profiling saves — they must NOT appear in the Unsync tab.
-    // They exist only so the profiling flow can restore typed fields on reopen.
-    // A record only enters the Unsync tab after the user fully completes and
-    // submits the profiling form, at which point status is set to 'Unsync'.
+    // In-progress drafts (status == 'draft' or empty) are mid-profiling saves
+    // and must NOT appear in the Unsync tab.
     if (status.isEmpty || status == 'draft') {
       return false;
     }
 
-    // Only explicitly finalized-but-unsynced records belong in the Unsync tab.
-    if (status == 'unsync' || status == 'unsynced') {
-      return true;
-    }
-
-    // Exclude cloud workflow states.
-    if (status == 'pending approval' ||
+    // Unsync tab is local-history view: include finalized local records,
+    // even if already synced (Pending/Approved), so users can still view
+    // their local copy and its status marker.
+    if (status == 'unsync' ||
+        status == 'unsynced' ||
+        status == 'pending approval' ||
         status == 'pending' ||
         status == 'approved') {
-      return false;
+      return true;
     }
 
     return false;
@@ -463,20 +459,24 @@ class _DataScreenState extends State<DataScreen>
             'showing ${dedupedUnsyncDrafts.length} after dedupe',
           );
 
+          final unsyncDataMaps = dedupedUnsyncDrafts
+              .map(_buildDataMap)
+              .toList();
+
           if (mounted) {
             setState(() {
-              _unsyncData = dedupedUnsyncDrafts.map(_buildDataMap).toList();
+              _unsyncData = unsyncDataMaps;
             });
           }
           debugPrint(
-            '✅ Unsync tab ready with ${_unsyncData.length} local profiles',
+            '✅ Unsync tab ready with ${unsyncDataMaps.length} local profiles',
           );
         } catch (e) {
           debugPrint('❌ Error loading disk drafts: $e');
         }
       }
 
-      // NOTE: Pending and Approved data are loaded ONLY when user clicks their tabs
+      // NOTE: Approved data are loaded ONLY when user clicks the Approved tab
       // See: onTap handlers in FilterTab widgets below
     } catch (e) {
       debugPrint('❌ Error in _loadProfilingData: $e');
@@ -607,12 +607,15 @@ class _DataScreenState extends State<DataScreen>
 
   Map<String, dynamic> _buildDataMap(ProfilingData draft) {
     // Determine status based on the status field only
-    String status = draft.status ?? 'Unsync';
+    final rawStatus = (draft.status ?? 'Unsync').trim();
+    final normalizedStatus = rawStatus.toLowerCase();
+    String status;
 
     // Map status values for display
-    if (status == 'Approved') {
+    if (normalizedStatus == 'approved') {
       status = 'Approved';
-    } else if (status == 'Pending Approval') {
+    } else if (normalizedStatus == 'pending approval' ||
+        normalizedStatus == 'pending') {
       status = 'Pending';
     } else {
       status = 'Unsync';
@@ -720,21 +723,30 @@ class _DataScreenState extends State<DataScreen>
 
     if (!mounted) return;
 
+    // Action buttons should follow the active tab context.
+    // If a pending profile is shown inside the Unsync tab (for visibility),
+    // keep Unsync actions and do not show Approve/Decline there.
+    final String modalStatus = _selectedFilter == 'Unsync'
+        ? 'Unsync'
+        : (data['status'] ?? 'Unsync');
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => DataViewModal(
           profileData: data,
-          dataStatus: data['status'],
-          onEdit: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Edit functionality'),
-                backgroundColor: DAColors.primaryGreen,
-              ),
-            );
-          },
+          dataStatus: modalStatus,
+          onEdit: canApprove
+              ? () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Edit functionality'),
+                      backgroundColor: DAColors.primaryGreen,
+                    ),
+                  );
+                }
+              : null,
           onSync: () async {
             bool loadingDialogShown = false;
             BuildContext? loadingDialogContext;
@@ -811,8 +823,21 @@ class _DataScreenState extends State<DataScreen>
               try {
                 final bool isExistingFarmer =
                     profilingData.isExistingFarmer == true;
+
+                // Auto-detect: If profile has recurrence data by year and a saadIdNo,
+                // treat as existing farmer even if flag isn't set.
+                final hasRecurrenceData =
+                    (profilingData.recurrenceByYear?.isNotEmpty ?? false);
+                final hasSaadId =
+                    (profilingData.saadIdNo?.trim().isNotEmpty ?? false);
+                final shouldTryExistingFarmerSync =
+                    hasRecurrenceData &&
+                    hasSaadId &&
+                    (profilingData.selectedExistingSaadId?.trim().isNotEmpty ??
+                        false);
+
                 final syncResult =
-                    await (isExistingFarmer
+                    await (isExistingFarmer || shouldTryExistingFarmerSync
                             ? _storage.syncExistingRecurrenceToApproved(
                                 profilingData,
                                 user.uid,
@@ -824,7 +849,8 @@ class _DataScreenState extends State<DataScreen>
                 if (!mounted) return;
 
                 if (success) {
-                  profilingData.status = isExistingFarmer
+                  profilingData.status =
+                      (isExistingFarmer || shouldTryExistingFarmerSync)
                       ? 'Approved'
                       : 'Pending Approval';
                   await _storage.saveDraftLocally(
@@ -854,8 +880,9 @@ class _DataScreenState extends State<DataScreen>
                     } else if (_selectedFilter == 'Unsync') {
                       await _loadProfilingData();
                     }
-                    await _loadPendingProfiles();
-                    if (isExistingFarmer) {
+                    // Reload both pending and approved for existing farmer sync
+                    if ((isExistingFarmer || shouldTryExistingFarmerSync)) {
+                      await _loadPendingProfiles();
                       await _loadApprovedProfiles();
                     }
                   }
@@ -1320,6 +1347,7 @@ class _DataScreenState extends State<DataScreen>
                       setState(() {
                         _selectedFilter = 'Unsync';
                       });
+                      _loadProfilingData();
                       debugPrint('📱 Unsync tab selected - showing local data');
                     },
                   ),

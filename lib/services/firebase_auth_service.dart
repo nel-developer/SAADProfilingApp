@@ -8,6 +8,25 @@ class FirebaseAuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Map<String, String> _roleCache = {}; // in-memory cache: uid -> role
 
+  Future<void> _ensureAccountManagementAccess() async {
+    final actor = _firebaseAuth.currentUser;
+    if (actor == null) {
+      throw Exception('No user logged in.');
+    }
+
+    final actorDoc = await _firestore
+        .collection('users')
+        .doc(actor.uid)
+        .get(const GetOptions(source: Source.server));
+    final role = (actorDoc.data()?['role'] as String?)?.toLowerCase();
+
+    if (role != 'admin' && role != 'moderator') {
+      throw Exception(
+        'Only admins and moderators can manage account approvals and roles.',
+      );
+    }
+  }
+
   Future<void> _ensureOnlineForAdminWrite() async {
     try {
       await _firestore
@@ -57,8 +76,6 @@ class FirebaseAuthService {
         'createdAt': FieldValue.serverTimestamp(),
         'accountStatus': 'pending_review', // Default status
         'role': 'user', // Default role - will be updated on approval
-        // Do not create a separate 'roles' array on registration to avoid
-        // redundant fields. Use single 'role' field as canonical source.
       });
 
       return userCredential;
@@ -221,34 +238,18 @@ class FirebaseAuthService {
   }
 
   /// Assign role to user (admin only)
-  /// Roles: 'admin', 'moderator', 'profiler'
+  /// Allowed values: 'admin', 'moderator', 'profiler'
   Future<void> assignRole(String uid, String role) async {
     try {
       await _ensureOnlineForAdminWrite();
-
-      // Get current roles
-      final userDoc = await _firestore.collection('users').doc(uid).get();
-      List<String> roles = List<String>.from(userDoc['roles'] ?? []);
-
-      // If the legacy/array `roles` is missing but a primary `role` exists,
-      // seed the list so we preserve prior role information.
-      if (roles.isEmpty) {
-        final primary = userDoc['role'] as String?;
-        if (primary != null && primary.isNotEmpty) {
-          roles.add(primary);
-        }
-      }
-
-      // Add role if not already present
-      if (!roles.contains(role)) {
-        roles.add(role);
-      }
-
-      // Update user document
+      await _ensureAccountManagementAccess();
       await _firestore.collection('users').doc(uid).update({
-        'roles': roles,
-        'role': role, // Set as primary role
+        'role': role,
+        'roleUpdatedAt': FieldValue.serverTimestamp(),
       });
+
+      _roleCache[uid] = role;
+      _saveRoleToPrefs(uid, role);
     } catch (e) {
       throw Exception('Failed to assign role: $e');
     }
@@ -258,13 +259,17 @@ class FirebaseAuthService {
   Future<void> approveUserWithRole(String uid, String role) async {
     try {
       await _ensureOnlineForAdminWrite();
+      await _ensureAccountManagementAccess();
 
       await _firestore.collection('users').doc(uid).update({
         'accountStatus': 'approved',
         'role': role,
-        'roles': [role],
+        'roleUpdatedAt': FieldValue.serverTimestamp(),
         'approvedAt': FieldValue.serverTimestamp(),
       });
+
+      _roleCache[uid] = role;
+      _saveRoleToPrefs(uid, role);
     } catch (e) {
       throw Exception('Failed to approve user: $e');
     }
@@ -274,6 +279,7 @@ class FirebaseAuthService {
   Future<void> rejectUser(String uid, String reason) async {
     try {
       await _ensureOnlineForAdminWrite();
+      await _ensureAccountManagementAccess();
 
       await _firestore.collection('users').doc(uid).update({
         'accountStatus': 'rejected',
@@ -359,32 +365,19 @@ class FirebaseAuthService {
     }
   }
 
-  /// Get user roles list
-  Future<List<String>> getUserRoles(String uid) async {
-    try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-      final roles = List<String>.from(doc['roles'] ?? []);
-      if (roles.isNotEmpty) return roles;
-
-      // Fallback to single `role` field if `roles` array is not present.
-      final primary = doc['role'] as String?;
-      if (primary != null && primary.isNotEmpty) return [primary];
-
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
   /// Update user role (for already approved accounts)
   Future<void> updateUserRole(String uid, String newRole) async {
     try {
       await _ensureOnlineForAdminWrite();
+      await _ensureAccountManagementAccess();
 
       await _firestore.collection('users').doc(uid).update({
         'role': newRole,
         'roleUpdatedAt': FieldValue.serverTimestamp(),
       });
+
+      _roleCache[uid] = newRole;
+      _saveRoleToPrefs(uid, newRole);
     } catch (e) {
       throw Exception('Failed to update user role: $e');
     }

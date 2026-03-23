@@ -165,6 +165,13 @@ class _ProfilingFlowState extends State<ProfilingFlow>
     return shouldExit == true;
   }
 
+  /// Clears session so the next profiling open always starts with a fresh form.
+  void _clearSession() {
+    _sessionData = null;
+    _sessionStep = 1;
+    _sessionInitializedSteps = {1};
+  }
+
   Future<bool> _handleSystemBack() async {
     if (_currentStep > 1) {
       _goToPreviousStep();
@@ -333,6 +340,10 @@ class _ProfilingFlowState extends State<ProfilingFlow>
         addMissing(3, 'Indigenous Group');
       }
       if (_currentData.isPWD == null) addMissing(3, 'Is PWD');
+      if (_currentData.maritalStatus == null ||
+          _currentData.maritalStatus!.trim().isEmpty) {
+        addMissing(3, 'Marital Status');
+      }
       // spouseName is exempt (not required)
       if (_currentData.tribeEthnicity == null ||
           _currentData.tribeEthnicity!.trim().isEmpty) {

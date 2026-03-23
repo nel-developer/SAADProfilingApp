@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/models/commodity_data.dart';
 import 'package:da_project_1/services/commodity_service.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'package:da_project_1/widgets/green_header_section.dart';
 
 /// AdminCommodityPage — Admin-only interface to manage commodity data
@@ -27,6 +28,7 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
   static const double _refHeight = 852.0;
 
   final CommodityService _commodityService = CommodityService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
   List<CommodityData> _commodities = [];
   bool _loading = true;
 
@@ -67,7 +69,7 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
     );
 
     _controller.forward();
-    _loadCommodities();
+    _checkAccessAndLoad();
   }
 
   @override
@@ -92,6 +94,42 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _checkAccessAndLoad() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    final role = await _authService.getUserRole(user.uid);
+    final roleLower = role?.toLowerCase();
+    if (roleLower != 'admin') {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Restricted'),
+          content: const Text('Only admins can manage commodities.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    await _loadCommodities();
   }
 
   double _scale(BuildContext context) {

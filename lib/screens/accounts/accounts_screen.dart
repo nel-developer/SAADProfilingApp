@@ -24,13 +24,15 @@ class _AccountsScreenState extends State<AccountsScreen>
   late Animation<double> _leafLeftAnim;
   late Animation<double> _leafRightAnim;
 
-  String _selectedFilter = 'Pending'; // Start with Pending to show new registrations
+  String _selectedFilter =
+      'Pending'; // Start with Pending to show new registrations
   final TextEditingController _searchController = TextEditingController();
   final FirebaseAuthService _authService = FirebaseAuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   List<Map<String, dynamic>> _allAccounts = [];
   bool _isLoading = true;
+  bool _canManageAccountActions = false;
 
   @override
   void initState() {
@@ -72,7 +74,7 @@ class _AccountsScreenState extends State<AccountsScreen>
     _checkAccessAndLoad();
   }
 
-  /// Ensure only Admins and Moderators can view this screen
+  /// Ensure only Admins, Moderators, and Profilers can view this screen
   Future<void> _checkAccessAndLoad() async {
     final user = _authService.currentUser;
     if (user == null) {
@@ -82,7 +84,10 @@ class _AccountsScreenState extends State<AccountsScreen>
 
     final role = await _authService.getUserRole(user.uid);
     final roleLower = role?.toLowerCase();
-    if (roleLower == null || !(roleLower == 'admin' || roleLower == 'moderator')) {
+    if (roleLower == null ||
+        !(roleLower == 'admin' ||
+            roleLower == 'moderator' ||
+            roleLower == 'profiler')) {
       // Not allowed — show restricted dialog then pop
       if (!mounted) return;
       await showDialog(
@@ -103,6 +108,13 @@ class _AccountsScreenState extends State<AccountsScreen>
       return;
     }
 
+    if (mounted) {
+      setState(() {
+        _canManageAccountActions =
+            roleLower == 'admin' || roleLower == 'moderator';
+      });
+    }
+
     // Allowed — proceed to load accounts
     await _loadAccounts();
   }
@@ -120,14 +132,17 @@ class _AccountsScreenState extends State<AccountsScreen>
 
         // Map role for display (capitalize)
         String roleForDisplay = data['role']?.toString() ?? 'user';
-        roleForDisplay = roleForDisplay[0].toUpperCase() + roleForDisplay.substring(1);
+        roleForDisplay =
+            roleForDisplay[0].toUpperCase() + roleForDisplay.substring(1);
 
         final status = data['accountStatus'] ?? 'pending_review';
         final isPending = status == 'pending_review';
 
         return {
           'uid': doc.id,
-          'name': '${data['firstName'] ?? ''} ${data['middleName'] ?? ''} ${data['lastName'] ?? ''}'.trim(),
+          'name':
+              '${data['firstName'] ?? ''} ${data['middleName'] ?? ''} ${data['lastName'] ?? ''}'
+                  .trim(),
           'email': data['email'] ?? '',
           'role': roleForDisplay,
           'status': isPending ? 'Pending' : 'Active',
@@ -146,7 +161,10 @@ class _AccountsScreenState extends State<AccountsScreen>
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading accounts: $e'), backgroundColor: DAColors.red),
+          SnackBar(
+            content: Text('Error loading accounts: $e'),
+            backgroundColor: DAColors.red,
+          ),
         );
       }
     }
@@ -183,8 +201,11 @@ class _AccountsScreenState extends State<AccountsScreen>
     }).toList();
   }
 
-  void _showAccountRoleModal(BuildContext context,
-      {Map<String, dynamic>? account, bool isEdit = false}) {
+  void _showAccountRoleModal(
+    BuildContext context, {
+    Map<String, dynamic>? account,
+    bool isEdit = false,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -193,7 +214,7 @@ class _AccountsScreenState extends State<AccountsScreen>
           currentRole: account?['role'],
           onRoleSelected: (selectedRole) async {
             Navigator.pop(dialogContext);
-            
+
             try {
               if (isEdit) {
                 // Update existing role
@@ -208,10 +229,10 @@ class _AccountsScreenState extends State<AccountsScreen>
                   selectedRole.toLowerCase(),
                 );
               }
-              
+
               // Reload accounts
               await _loadAccounts();
-              
+
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -247,12 +268,9 @@ class _AccountsScreenState extends State<AccountsScreen>
 
   void _handleDecline(Map<String, dynamic> account) async {
     try {
-      await _authService.rejectUser(
-        account['uid'],
-        'Rejected by admin',
-      );
+      await _authService.rejectUser(account['uid'], 'Rejected by admin');
       await _loadAccounts();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -288,13 +306,24 @@ class _AccountsScreenState extends State<AccountsScreen>
     final isLargeTablet = width > 900;
 
     final headerHeight =
-        height * (isLargeTablet ? 0.18 : isTablet ? 0.22 : 0.28);
+        height *
+        (isLargeTablet
+            ? 0.18
+            : isTablet
+            ? 0.22
+            : 0.28);
 
-    final titleFontSize =
-        isLargeTablet ? 48.0 : isTablet ? 38.0 : width * 0.08;
+    final titleFontSize = isLargeTablet
+        ? 48.0
+        : isTablet
+        ? 38.0
+        : width * 0.08;
 
-    final subtitleFontSize =
-        isLargeTablet ? 18.0 : isTablet ? 16.0 : width * 0.038;
+    final subtitleFontSize = isLargeTablet
+        ? 18.0
+        : isTablet
+        ? 16.0
+        : width * 0.038;
 
     return Scaffold(
       backgroundColor: const Color(0xFFE8E8E8),
@@ -479,40 +508,46 @@ class _AccountsScreenState extends State<AccountsScreen>
                     ),
                   )
                 : _filteredAccounts.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No accounts found',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: width * 0.06,
-                          vertical: height * 0.01,
-                        ),
-                        itemCount: _filteredAccounts.length,
-                        itemBuilder: (context, index) {
-                          final account = _filteredAccounts[index];
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: height * 0.02),
-                            child: AccountCard(
-                              name: account['name'],
-                              email: account['email'],
-                              date: account['date'],
-                              role: account['role'],
-                              status: account['status'],
-                              isPending: account['isPending'],
-                              roleColor: _getRoleColor(account['role']),
-                              onAccept: () => _handleAccept(account),
-                              onDecline: () => _handleDecline(account),
-                              onEdit: () => _handleEdit(account),
-                            ),
-                          );
-                        },
+                ? Center(
+                    child: Text(
+                      'No accounts found',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.grey,
                       ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: width * 0.06,
+                      vertical: height * 0.01,
+                    ),
+                    itemCount: _filteredAccounts.length,
+                    itemBuilder: (context, index) {
+                      final account = _filteredAccounts[index];
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: height * 0.02),
+                        child: AccountCard(
+                          name: account['name'],
+                          email: account['email'],
+                          date: account['date'],
+                          role: account['role'],
+                          status: account['status'],
+                          isPending: account['isPending'],
+                          roleColor: _getRoleColor(account['role']),
+                          onAccept: _canManageAccountActions
+                              ? () => _handleAccept(account)
+                              : null,
+                          onDecline: _canManageAccountActions
+                              ? () => _handleDecline(account)
+                              : null,
+                          onEdit: _canManageAccountActions
+                              ? () => _handleEdit(account)
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

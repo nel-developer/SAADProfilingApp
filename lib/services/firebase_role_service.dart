@@ -9,8 +9,10 @@ class FirebaseRoleService {
   /// Get current user's role
   Future<String?> getUserRole(String uid) async {
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
+      DocumentSnapshot doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
       return doc['role'] as String?;
     } catch (e) {
       debugPrint('Error fetching user role: $e');
@@ -41,10 +43,7 @@ class FirebaseRoleService {
 
       final snapshot = await _firestore.collection('users').get();
       return snapshot.docs
-          .map((doc) => {
-                'uid': doc.id,
-                ...doc.data(),
-              })
+          .map((doc) => {'uid': doc.id, ...doc.data()})
           .toList();
     } catch (e) {
       debugPrint('Error fetching users: $e');
@@ -62,7 +61,7 @@ class FirebaseRoleService {
 
       final isAdmin = await isUserAdmin(currentUser.uid);
       if (!isAdmin) {
-        throw Exception('Only admins can update user roles');
+        throw Exception('Only admins can update user role');
       }
 
       await _firestore.collection('users').doc(uid).update({
@@ -118,10 +117,7 @@ class FirebaseRoleService {
         ];
       case 'user':
       default:
-        return [
-          'view_own_profile',
-          'edit_own_profile',
-        ];
+        return ['view_own_profile', 'edit_own_profile'];
     }
   }
 

@@ -4,7 +4,6 @@ import 'package:da_project_1/theme/da_colors.dart';
 import 'package:da_project_1/widgets/custom_textfield.dart';
 import 'package:da_project_1/screens/profiling/profiling_step_wrapper.dart';
 import 'package:da_project_1/models/profiling_data.dart';
-import 'package:da_project_1/services/profiling_storage_service.dart';
 
 /// Step 8 of 11 — Recurrence
 ///
@@ -32,7 +31,6 @@ class Step07Recurrence extends StatefulWidget {
 }
 
 class _Step07RecurrenceState extends State<Step07Recurrence> {
-  final ProfilingStorageService _storage = ProfilingStorageService();
   // ── Controllers ──
   final TextEditingController _maleCtrl = TextEditingController();
   final TextEditingController _femaleCtrl = TextEditingController();
@@ -86,11 +84,25 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
 
   void _loadData() {
     if (widget.currentData != null) {
-      final selectedYear =
+      final preferredYear =
           widget.currentData!.yearCovered?.toString() ??
           DateTime.now().year.toString();
-      _selectedYear = selectedYear;
-      _loadYearDataIntoFields(selectedYear, saveCurrentYearBeforeLoad: false);
+      final availableYears = _getAvailableYears();
+
+      if (availableYears.contains(preferredYear)) {
+        _selectedYear = preferredYear;
+      } else if (availableYears.isNotEmpty) {
+        _selectedYear = availableYears.first;
+      } else {
+        _selectedYear = null;
+      }
+
+      if (_selectedYear != null && _selectedYear!.trim().isNotEmpty) {
+        _loadYearDataIntoFields(
+          _selectedYear!,
+          saveCurrentYearBeforeLoad: false,
+        );
+      }
     }
   }
 
@@ -101,6 +113,29 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
     if (raw is Map) {
       return Map<String, dynamic>.from(raw);
     }
+    return <String, dynamic>{};
+  }
+
+  Map<String, dynamic> _getLatestYearEntry(
+    Map<String, dynamic> allYears,
+    String excludeYear,
+  ) {
+    final keys = allYears.keys.where((key) => key != excludeYear).toList();
+    if (keys.isEmpty) return <String, dynamic>{};
+
+    keys.sort((a, b) {
+      final ai = int.tryParse(a.trim()) ?? -1;
+      final bi = int.tryParse(b.trim()) ?? -1;
+      return bi.compareTo(ai);
+    });
+
+    for (final key in keys) {
+      final raw = allYears[key];
+      if (raw is Map && raw.isNotEmpty) {
+        return Map<String, dynamic>.from(raw);
+      }
+    }
+
     return <String, dynamic>{};
   }
 
@@ -166,6 +201,15 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
       final existingYear = existingYearRaw is Map
           ? Map<String, dynamic>.from(existingYearRaw)
           : <String, dynamic>{};
+      final latestYear = _getLatestYearEntry(all, year);
+
+      dynamic withFallback(dynamic currentValue, String key) {
+        if (currentValue != null) return currentValue;
+        final existingValue = existingYear[key];
+        if (existingValue != null) return existingValue;
+        return latestYear[key];
+      }
+
       all[year] = {
         ...existingYear,
         'maleFamilyMembers': male,
@@ -173,16 +217,60 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
         'yearsInFarming': years,
         'landTenureship': land,
         'landTenureshipOthers': landOther,
-        'cooperativeName': data.cooperativeName,
-        'hasOrganization': data.hasOrganization,
-        'cooperativePosition': data.cooperativePosition,
-        'dateOfMembership': data.dateOfMembership,
-        'cooperativePositionOthers': data.cooperativePositionOthers,
-        'primaryCommodity': data.primaryCommodity,
-        'secondaryCommodity': data.secondaryCommodity,
+        'saadCommodityType': withFallback(
+          data.saadCommodityType,
+          'saadCommodityType',
+        ),
+        'saadCommodities': withFallback(
+          data.saadCommodities,
+          'saadCommodities',
+        ),
+        'nonSAADCommodityType': withFallback(
+          data.nonSAADCommodityType,
+          'nonSAADCommodityType',
+        ),
+        'nonSAADCommodities': withFallback(
+          data.nonSAADCommodities,
+          'nonSAADCommodities',
+        ),
+        'cooperativeName': withFallback(
+          data.cooperativeName,
+          'cooperativeName',
+        ),
+        'hasOrganization': withFallback(
+          data.hasOrganization,
+          'hasOrganization',
+        ),
+        'cooperativePosition': withFallback(
+          data.cooperativePosition,
+          'cooperativePosition',
+        ),
+        'dateOfMembership': withFallback(
+          data.dateOfMembership,
+          'dateOfMembership',
+        ),
+        'cooperativePositionOthers': withFallback(
+          data.cooperativePositionOthers,
+          'cooperativePositionOthers',
+        ),
+        'primaryCommodity': withFallback(
+          data.primaryCommodity,
+          'primaryCommodity',
+        ),
+        'secondaryCommodity': withFallback(
+          data.secondaryCommodity,
+          'secondaryCommodity',
+        ),
         'receivedPrimaryCommodity':
-            data.receivedPrimaryCommodity ?? data.receivedCommodity,
-        'receivedSecondaryCommodity': data.receivedSecondaryCommodity,
+            withFallback(
+              data.receivedPrimaryCommodity ?? data.receivedCommodity,
+              'receivedPrimaryCommodity',
+            ) ??
+            withFallback(data.receivedCommodity, 'receivedCommodity'),
+        'receivedSecondaryCommodity': withFallback(
+          data.receivedSecondaryCommodity,
+          'receivedSecondaryCommodity',
+        ),
       };
       data.recurrenceByYear = all;
     }
@@ -441,9 +529,9 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
               child: isSelected
                   ? Center(
                       child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           color: DAColors.primaryGreen,
                         ),
@@ -483,6 +571,9 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
 
   Widget _buildYearDropdown() {
     final years = _getAvailableYears();
+    final selectedYearForDropdown = years.contains(_selectedYear)
+        ? _selectedYear
+        : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -503,7 +594,7 @@ class _Step07RecurrenceState extends State<Step07Recurrence> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        initialValue: _selectedYear,
+        initialValue: selectedYearForDropdown,
         decoration: InputDecoration(
           hintText: 'Select Year',
           hintStyle: GoogleFonts.poppins(

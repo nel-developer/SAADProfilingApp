@@ -51,7 +51,7 @@ function inferRole(data, docId) {
 }
 
 async function run() {
-  const { key } = parseArgs();
+  const { key, dryRun = false, uid } = parseArgs();
   await initAdmin(key);
   const db = admin.firestore();
 

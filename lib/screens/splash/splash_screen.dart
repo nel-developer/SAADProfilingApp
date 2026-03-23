@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:da_project_1/routes/app_routes.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:da_project_1/services/offline_auth_service.dart';
+import 'package:da_project_1/services/firebase_auth_service.dart';
 import 'dart:math';
 
 class SplashScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   static const double _refWidth = 393.0;
   static const double _refHeight = 852.0;
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   @override
   void initState() {
@@ -30,9 +32,28 @@ class _SplashScreenState extends State<SplashScreen> {
     // Check if Firebase user is logged in (online session)
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser != null) {
-      // Online session exists
+      String? accountStatus;
+      final cached = await _authService.getCachedUserData(firebaseUser.uid);
+      accountStatus = cached?['accountStatus'] as String?;
+
+      if (accountStatus == null) {
+        try {
+          final userData = await _authService.getUserData(firebaseUser.uid);
+          accountStatus = userData?['accountStatus'] as String?;
+        } catch (_) {
+          accountStatus = null;
+        }
+      }
+
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
+        if (accountStatus == 'pending_review') {
+          Navigator.pushReplacementNamed(context, AppRoutes.accountUnderReview);
+        } else if (accountStatus == 'rejected') {
+          await FirebaseAuth.instance.signOut();
+          Navigator.pushReplacementNamed(context, AppRoutes.login);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
       }
       return;
     }
@@ -57,10 +78,14 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   double _scale(BuildContext context) {
-    final scaleW =
-        (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
-    final scaleH =
-        (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
+      0.5,
+      2.0,
+    );
+    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(
+      0.5,
+      2.0,
+    );
     return min(scaleW, scaleH);
   }
 
@@ -82,10 +107,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
           /// LOGO
           Center(
-            child: Image.asset(
-              'assets/images/da_logo.png',
-              width: logoWidth,
-            ),
+            child: Image.asset('assets/images/da_logo.png', width: logoWidth),
           ),
         ],
       ),

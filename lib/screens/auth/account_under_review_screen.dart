@@ -22,7 +22,7 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
   late Animation<double> _logoScaleAnim;
   late Animation<double> _cardSlideAnim;
   late Animation<double> _cardOpacityAnim;
-  
+
   final FirebaseAuthService _authService = FirebaseAuthService();
   late Timer? _approvalCheckTimer;
 
@@ -85,6 +85,12 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
             if (mounted) {
               Navigator.pushReplacementNamed(context, AppRoutes.home);
             }
+          } else if (accountStatus == 'rejected') {
+            _approvalCheckTimer?.cancel();
+            await _authService.signOut();
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, AppRoutes.login);
+            }
           }
         }
       } catch (e) {
@@ -101,10 +107,14 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
   }
 
   double _scale(BuildContext context) {
-    final scaleW =
-        (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
-    final scaleH =
-        (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
+      0.5,
+      2.0,
+    );
+    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(
+      0.5,
+      2.0,
+    );
     return min(scaleW, scaleH);
   }
 
@@ -141,9 +151,7 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
 
           /// DARK OVERLAY
           Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.15),
-            ),
+            child: Container(color: Colors.black.withOpacity(0.15)),
           ),
 
           /// CONTENT
@@ -242,8 +250,9 @@ class _AccountUnderReviewScreenState extends State<AccountUnderReviewScreen>
                                       backgroundColor: DAColors.primaryGreen,
                                       foregroundColor: DAColors.white,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(buttonRadius),
+                                        borderRadius: BorderRadius.circular(
+                                          buttonRadius,
+                                        ),
                                       ),
                                       elevation: 0,
                                       padding: EdgeInsets.symmetric(

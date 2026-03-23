@@ -79,16 +79,23 @@ class _Step01PersonalInfoState extends State<Step01PersonalInfo> {
     final data = widget.currentData;
     if (data == null) return;
 
-    // Always open Step 1 as New Farmer on profiling reopen.
-    _isExistingFarmer = false;
-    _selectedExistingSaadId = null;
-    _saadSearchCtrl.clear();
-    data.isExistingFarmer = false;
-    data.selectedExistingSaadId = null;
-    data.saadIdNo = null;
-    data.rsbsaFishrIdNo = null;
+    // Restore previously selected profiling mode and keep its draft values.
+    _isExistingFarmer = data.isExistingFarmer == true;
+    if (_isExistingFarmer) {
+      final selectedId = data.selectedExistingSaadId?.trim();
+      final fallbackSaad = data.saadIdNo?.trim();
+      _selectedExistingSaadId = (selectedId != null && selectedId.isNotEmpty)
+          ? selectedId
+          : ((fallbackSaad != null && fallbackSaad.isNotEmpty)
+                ? fallbackSaad
+                : null);
+      _saadSearchCtrl.text = _selectedExistingSaadId ?? '';
+    } else {
+      _selectedExistingSaadId = null;
+      _saadSearchCtrl.clear();
+    }
 
-    // Restore typed values from draft while keeping mode as New Farmer.
+    // Restore typed values from saved draft.
     _firstNameCtrl.text = data.firstName ?? '';
     _middleNameCtrl.text = data.middleName ?? '';
     _surnameCtrl.text = data.surname ?? '';

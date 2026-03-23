@@ -448,7 +448,7 @@ class ProfilingStorageService {
           if (_isInProgressDraft(parsed) && _hasMeaningfulInput(parsed)) {
             if (currentCandidate == null ||
                 (parsed.updatedAt ?? DateTime(1970)).isAfter(
-                  currentCandidate!.data.updatedAt ?? DateTime(1970),
+                  currentCandidate.data.updatedAt ?? DateTime(1970),
                 )) {
               currentCandidate = (data: parsed, raw: prefsDraft);
             }
@@ -459,11 +459,10 @@ class ProfilingStorageService {
       // If we have a valid current draft pointer, always restore it first.
       if (currentCandidate != null) {
         final bestPayload =
-            currentCandidate!.raw ??
-            _profilingDataToJson(currentCandidate!.data);
+            currentCandidate.raw ?? _profilingDataToJson(currentCandidate.data);
         _inMemoryCurrentDraft = bestPayload;
         await _saveCurrentDraftToPrefs(bestPayload);
-        return currentCandidate!.data;
+        return currentCandidate.data;
       }
 
       final candidates = <({ProfilingData data, Map<String, dynamic>? raw})>[];
@@ -662,6 +661,34 @@ class ProfilingStorageService {
       // the in-memory object currently shown by the UI.
       final workingData = _jsonToProfilingData(_profilingDataToJson(data));
 
+      // DUPLICATE GUARD: If an approved profile already exists with the same
+      // SAAD ID, route to the existing-farmer recurrence sync instead of
+      // creating a new pending record — regardless of the isExistingFarmer flag.
+      final guardSaadId = workingData.saadIdNo?.trim() ?? '';
+      if (guardSaadId.isNotEmpty) {
+        try {
+          final approvedSnap = await _firestore
+              .collection('profiling_forms')
+              .where('status', isEqualTo: 'Approved')
+              .where('saadIdNo', isEqualTo: guardSaadId)
+              .limit(1)
+              .get()
+              .timeout(const Duration(seconds: 10));
+          if (approvedSnap.docs.isNotEmpty) {
+            debugPrint(
+              '🛡️ Approved profile exists for SAAD=$guardSaadId — routing to existing-farmer sync',
+            );
+            // Ensure the flags are set before delegating
+            data.isExistingFarmer = true;
+            data.selectedExistingSaadId ??= guardSaadId;
+            return await syncExistingRecurrenceToApproved(data, userId);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Duplicate guard check failed (non-fatal): $e');
+          // Fall through to normal pending sync on error
+        }
+      }
+
       if (workingData.isExistingFarmer != true) {
         // New Farmer sync must not reuse Existing Farmer identifiers.
         workingData.selectedExistingSaadId = null;
@@ -767,12 +794,14 @@ class ProfilingStorageService {
       final selectedIncoming = selectedIncomingRaw is Map
           ? Map<String, dynamic>.from(selectedIncomingRaw)
           : <String, dynamic>{};
+      debugPrint(
+        '🧭 Recurrence sync incoming keys for year $selectedYear: ${selectedIncoming.keys.toList()}',
+      );
 
       final snapshot = await _firestore
           .collection('profiling_forms')
           .where('status', isEqualTo: 'Approved')
           .where('saadIdNo', isEqualTo: saadId)
-          .limit(1)
           .get()
           .timeout(const Duration(seconds: 20));
 
@@ -783,66 +812,108 @@ class ProfilingStorageService {
         );
       }
 
+      if (snapshot.docs.length > 1) {
+        return SyncResult.failure(
+          'Multiple approved profiles found for SAAD I.D No. $saadId. Please clean up duplicates before syncing recurrence.',
+          code: 'DUPLICATE_APPROVED_PROFILE',
+        );
+      }
+
       final targetDoc = snapshot.docs.first;
       final existingPayload = Map<String, dynamic>.from(targetDoc.data());
+      debugPrint(
+        '🧭 Recurrence sync target doc=${targetDoc.id} for SAAD=$saadId year=$selectedYear',
+      );
 
       final mergedByYear = <String, dynamic>{};
       final existingByYearRaw = existingPayload['recurrenceByYear'];
       if (existingByYearRaw is Map) {
         mergedByYear.addAll(Map<String, dynamic>.from(existingByYearRaw));
       }
+      // Snapshot of Firestore years BEFORE we add the new one — used for the
+      // integrity assertion at write time.
+      final firestoreYearsBefore = Set<String>.from(mergedByYear.keys);
+      debugPrint(
+        '🧭 Firestore existing years for SAAD=$saadId: ${firestoreYearsBefore.toList()}',
+      );
 
       final existingSelectedRaw = mergedByYear[selectedYear];
       final existingSelected = existingSelectedRaw is Map
           ? Map<String, dynamic>.from(existingSelectedRaw)
           : <String, dynamic>{};
 
-      final fallbackSelected = <String, dynamic>{
-        'maleFamilyMembers': data.maleFamilyMembers,
-        'femaleFamilyMembers': data.femaleFamilyMembers,
-        'yearsInFarming': data.yearsInFarming,
-        'landTenureship': data.landTenureship,
-        'landTenureshipOthers': data.landTenureshipOthers,
-      };
+      if (selectedIncoming.isEmpty) {
+        return SyncResult.failure(
+          'No recurrence data found for selected year $selectedYear. Please complete recurrence fields before syncing.',
+          code: 'MISSING_RECURRENCE_YEAR_DATA',
+        );
+      }
 
-      mergedByYear[selectedYear] = {
-        ...existingSelected,
-        ...(selectedIncoming.isNotEmpty ? selectedIncoming : fallbackSelected),
-      };
+      final sanitizedIncoming = Map<String, dynamic>.from(selectedIncoming);
 
-      final selectedYearDataRaw = mergedByYear[selectedYear];
-      final selectedYearData = selectedYearDataRaw is Map
-          ? Map<String, dynamic>.from(selectedYearDataRaw)
-          : <String, dynamic>{};
+      String? toSingleString(dynamic value) {
+        final text = value?.toString().trim();
+        if (text == null || text.isEmpty) return null;
+        return text;
+      }
+
+      Set<String> toSet(dynamic value) {
+        if (value == null) return <String>{};
+        if (value is Iterable) {
+          return value
+              .map((item) => item.toString().trim())
+              .where((item) => item.isNotEmpty)
+              .toSet();
+        }
+        final text = value.toString().trim();
+        if (text.isEmpty) return <String>{};
+        return text
+            .split(',')
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toSet();
+      }
+
+      final incomingPrimary =
+          toSingleString(sanitizedIncoming['receivedPrimaryCommodity']) ??
+          toSingleString(sanitizedIncoming['receivedCommodity']);
+      final incomingSecondary = toSet(
+        sanitizedIncoming['receivedSecondaryCommodity'],
+      );
+      if (incomingPrimary != null && incomingPrimary.isNotEmpty) {
+        incomingSecondary.remove(incomingPrimary);
+      }
+      sanitizedIncoming['receivedPrimaryCommodity'] = incomingPrimary;
+      sanitizedIncoming['receivedCommodity'] = incomingPrimary;
+      sanitizedIncoming['receivedSecondaryCommodity'] = incomingSecondary
+          .toList()
+          .join(', ');
+
+      // Replace selected year entry using the local year payload as source of
+      // truth. This avoids stale/duplicate carry-over from previously approved
+      // values when syncing existing farmer recurrence.
+      mergedByYear[selectedYear] = sanitizedIncoming;
+
+      // INTEGRITY GUARD: All Firestore years must still be present after merge.
+      // If any pre-existing year is missing, abort — this prevents year data loss.
+      final missingYears = firestoreYearsBefore
+          .where((y) => !mergedByYear.containsKey(y))
+          .toList();
+      if (missingYears.isNotEmpty) {
+        return SyncResult.failure(
+          'Sync aborted: year data integrity check failed. Missing years: $missingYears',
+          code: 'YEAR_INTEGRITY_FAILURE',
+        );
+      }
+
+      debugPrint(
+        '🧭 Recurrence sync final years for SAAD=$saadId: ${mergedByYear.keys.toList()} (added year $selectedYear)',
+      );
 
       final updatePayload = <String, dynamic>{
-        'status': 'Approved',
-        'userId': userId,
-        'yearCovered': int.tryParse(selectedYear) ?? data.yearCovered,
         'recurrenceByYear': mergedByYear,
-        'maleFamilyMembers':
-            selectedYearData['maleFamilyMembers'] ?? data.maleFamilyMembers,
-        'femaleFamilyMembers':
-            selectedYearData['femaleFamilyMembers'] ?? data.femaleFamilyMembers,
-        'yearsInFarming':
-            selectedYearData['yearsInFarming'] ?? data.yearsInFarming,
-        'landTenureship':
-            selectedYearData['landTenureship'] ?? data.landTenureship,
-        'landTenureshipOthers':
-            selectedYearData['landTenureshipOthers'] ??
-            data.landTenureshipOthers,
-        'agriRelatedIncome':
-            selectedYearData['agriRelatedIncome'] ?? data.agriRelatedIncome,
-        'saadNetIncome':
-            selectedYearData['saadNetIncome'] ?? data.saadNetIncome,
-        'nonSAADNetIncome':
-            selectedYearData['nonSAADNetIncome'] ?? data.nonSAADNetIncome,
-        'nonAgriRelatedIncome':
-            selectedYearData['nonAgriRelatedIncome'] ??
-            data.nonAgriRelatedIncome,
-        'mainSourcesOfIncome':
-            selectedYearData['mainSourcesOfIncome'] ?? data.mainSourcesOfIncome,
         'updatedAt': DateTime.now().toIso8601String(),
+        'draftStep': FieldValue.delete(),
       };
 
       await _firestore
@@ -936,11 +1007,6 @@ class ProfilingStorageService {
       'yearsInFarming': data.yearsInFarming,
       'landTenureship': data.landTenureship,
       'landTenureshipOthers': data.landTenureshipOthers,
-      'secondaryCommodityRecurrence': data.secondaryCommodityRecurrence,
-      'secondaryCommodityRecurrenceOthers':
-          data.secondaryCommodityRecurrenceOthers,
-      'primaryCommodityRecurrence': data.primaryCommodityRecurrence,
-      'primaryCommodityRecurrenceOthers': data.primaryCommodityRecurrenceOthers,
       'yearCovered': data.yearCovered,
       'recurrenceByYear': data.recurrenceByYear,
       'receivedCommodity':
@@ -953,17 +1019,6 @@ class ProfilingStorageService {
       'nonSAADNetIncome': data.nonSAADNetIncome,
       'nonAgriRelatedIncome': data.nonAgriRelatedIncome,
       'mainSourcesOfIncome': data.mainSourcesOfIncome,
-      // Specific commodity income fields
-      'riceIncomeField': data.riceIncomeField,
-      'riceRemarks': data.riceRemarks,
-      'hvcIncomeField': data.hvcIncomeField,
-      'hvcRemarks': data.hvcRemarks,
-      'livestockIncomeField': data.livestockIncomeField,
-      'livestockRemarks': data.livestockRemarks,
-      'fishingIncomeField': data.fishingIncomeField,
-      'fishingRemarks': data.fishingRemarks,
-      'nonFarmFisheriesIncomeField': data.nonFarmFisheriesIncomeField,
-      'nonFarmFisheriesRemarks': data.nonFarmFisheriesRemarks,
       'beneficiaryNonFarmIncome': data.beneficiaryNonFarmIncome,
       'beneficiaryRemarks': data.beneficiaryRemarks,
       'spouseNonFarmIncome': data.spouseNonFarmIncome,
@@ -1279,6 +1334,8 @@ class ProfilingStorageService {
 
       // EXPLICITLY ensure status is set in Firestore
       firestoreData['status'] = 'Pending Approval';
+      // draftStep is local-only; ensure it is not stored in Firestore
+      firestoreData['draftStep'] = FieldValue.delete();
 
       // Include enumerator email for auditing (prefer FirebaseAuth email, fallback to userId)
       try {

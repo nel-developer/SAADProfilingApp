@@ -40,6 +40,23 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
   final LocalCommodityCache _cache = LocalCommodityCache();
   List<String> _typeOptions = [];
 
+  Set<String> _parseCsvToSet(String? value) {
+    if (value == null || value.trim().isEmpty) return <String>{};
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+  }
+
+  void _sanitizeReceivedSelections() {
+    final primary = _receivedPrimary?.trim();
+    if (primary == null || primary.isEmpty) return;
+    _receivedSecondaryOptions = _receivedSecondaryOptions
+        .where((item) => item.trim() != primary)
+        .toSet();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -79,9 +96,8 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
       _selectedReceivedCommodity =
           widget.currentData!.receivedCommodity ?? _receivedPrimary;
       final recSec = widget.currentData!.receivedSecondaryCommodity ?? '';
-      _receivedSecondaryOptions = recSec.isEmpty
-          ? {}
-          : recSec.split(',').map((s) => s.trim()).toSet();
+      _receivedSecondaryOptions = _parseCsvToSet(recSec);
+      _sanitizeReceivedSelections();
       _primaryOthersCtrl.text =
           widget.currentData!.primaryCommodityOthers ?? '';
     }
@@ -99,6 +115,7 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
       widget.currentData!.receivedCommodity =
           _selectedReceivedCommodity ?? _receivedPrimary;
       widget.currentData!.receivedPrimaryCommodity = _receivedPrimary;
+      _sanitizeReceivedSelections();
       widget.currentData!.receivedSecondaryCommodity = _receivedSecondaryOptions
           .toList()
           .join(', ');
@@ -126,20 +143,7 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
   }
 
   void _handleNext() {
-    if (widget.currentData != null) {
-      widget.currentData!.primaryCommodity = _primaryCommodity;
-      widget.currentData!.secondaryCommodity = _selectedSecondaryOptions
-          .toList()
-          .join(', ');
-      widget.currentData!.primaryCommodityOthers = _primaryOthersCtrl.text
-          .trim();
-      widget.currentData!.receivedCommodity =
-          _selectedReceivedCommodity ?? _receivedPrimary;
-      widget.currentData!.receivedPrimaryCommodity = _receivedPrimary;
-      widget.currentData!.receivedSecondaryCommodity = _receivedSecondaryOptions
-          .toList()
-          .join(', ');
-    }
+    _autoSaveToCurrentData();
     widget.onNext();
   }
 
