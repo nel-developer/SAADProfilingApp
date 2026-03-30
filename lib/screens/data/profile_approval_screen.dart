@@ -54,22 +54,25 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
         _isLoading = true;
         _loadError = null;
       });
-      
+
       // Check internet connectivity first
       debugPrint('🔍 Checking internet connectivity...');
       final connectivityResult = await Connectivity().checkConnectivity();
-      
+
       // Handle both List and single ConnectivityResult
       bool isConnected = false;
       if (connectivityResult is List) {
-        isConnected = (connectivityResult as List).any((result) =>
-            result == ConnectivityResult.mobile || 
-            result == ConnectivityResult.wifi);
+        isConnected = (connectivityResult as List).any(
+          (result) =>
+              result == ConnectivityResult.mobile ||
+              result == ConnectivityResult.wifi,
+        );
       } else {
-        isConnected = connectivityResult == ConnectivityResult.mobile ||
-                      connectivityResult == ConnectivityResult.wifi;
+        isConnected =
+            connectivityResult == ConnectivityResult.mobile ||
+            connectivityResult == ConnectivityResult.wifi;
       }
-      
+
       if (!isConnected) {
         debugPrint('❌ No internet connection');
         setState(() {
@@ -80,12 +83,14 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
         });
         return;
       }
-      
+
       setState(() {
         _hasInternet = true;
       });
-      
-      debugPrint('✅ Internet available - Loading pending profiles from Firestore...');
+
+      debugPrint(
+        '✅ Internet available - Loading pending profiles from Firestore...',
+      );
       await _storage.init();
       final profiles = await _storage.loadPendingProfiles();
       debugPrint('✅ Pending profiles loaded: ${profiles.length} profile(s)');
@@ -119,8 +124,14 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
   }
 
   double _scale(BuildContext context) {
-    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(0.5, 2.0);
-    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(0.5, 2.0);
+    final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
+      0.5,
+      2.0,
+    );
+    final scaleH = (MediaQuery.of(context).size.height / _refHeight).clamp(
+      0.5,
+      2.0,
+    );
     return min(scaleW, scaleH);
   }
 
@@ -306,7 +317,9 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
             children: [
               const SizedBox(height: 16),
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(DAColors.primaryGreen),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  DAColors.primaryGreen,
+                ),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -321,10 +334,10 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
       );
 
       final result = await _storage.approvePendingProfile(docId, profile);
-      
+
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
-      
+
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -337,7 +350,7 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
       } else {
         final errorMsg = result.errorMessage ?? 'Unknown approval error';
         debugPrint('❌ Approval failed: $errorMsg (code: ${result.errorCode})');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Approval failed: $errorMsg'),
@@ -387,10 +400,10 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
       );
 
       final result = await _storage.rejectPendingProfile(docId, reason);
-      
+
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
-      
+
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -403,7 +416,7 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
       } else {
         final errorMsg = result.errorMessage ?? 'Unknown rejection error';
         debugPrint('❌ Rejection failed: $errorMsg (code: ${result.errorCode})');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Rejection failed: $errorMsg'),
@@ -499,9 +512,7 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(
-                          color: DAColors.primaryGreen,
-                        ),
+                        CircularProgressIndicator(color: DAColors.primaryGreen),
                         SizedBox(height: 24.0 * scale),
                         Text(
                           'Loading pending profiles...',
@@ -515,127 +526,129 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
                     ),
                   )
                 : !_hasInternet
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.wifi_off,
-                              size: 48.0 * scale,
-                              color: Colors.red.shade400,
-                            ),
-                            SizedBox(height: 16.0 * scale),
-                            Text(
-                              'No Internet Connection',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.0 * scale,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.red.shade600,
-                              ),
-                            ),
-                            SizedBox(height: 8.0 * scale),
-                            Text(
-                              'Please check your connection and try again',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.0 * scale,
-                                color: Colors.grey.shade600,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 24.0 * scale),
-                            ElevatedButton.icon(
-                              onPressed: _loadPendingProfiles,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: DAColors.primaryGreen,
-                              ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.wifi_off,
+                          size: 48.0 * scale,
+                          color: Colors.red.shade400,
                         ),
-                      )
-                    : _loadError != null
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  size: 48.0 * scale,
-                                  color: Colors.orange.shade400,
-                                ),
-                                SizedBox(height: 16.0 * scale),
-                                Text(
-                                  'Error Loading Profiles',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 16.0 * scale,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.orange.shade600,
-                                  ),
-                                ),
-                                SizedBox(height: 8.0 * scale),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 24.0 * scale),
-                                  child: Text(
-                                    _loadError ?? 'Unknown error occurred',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12.0 * scale,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                SizedBox(height: 24.0 * scale),
-                                ElevatedButton.icon(
-                                  onPressed: _loadPendingProfiles,
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Try Again'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: DAColors.primaryGreen,
-                                  ),
-                                ),
-                              ],
+                        SizedBox(height: 16.0 * scale),
+                        Text(
+                          'No Internet Connection',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.0 * scale,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.shade600,
+                          ),
+                        ),
+                        SizedBox(height: 8.0 * scale),
+                        Text(
+                          'Please check your connection and try again',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.0 * scale,
+                            color: Colors.grey.shade600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 24.0 * scale),
+                        ElevatedButton.icon(
+                          onPressed: _loadPendingProfiles,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: DAColors.primaryGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _loadError != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48.0 * scale,
+                          color: Colors.orange.shade400,
+                        ),
+                        SizedBox(height: 16.0 * scale),
+                        Text(
+                          'Error Loading Profiles',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.0 * scale,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange.shade600,
+                          ),
+                        ),
+                        SizedBox(height: 8.0 * scale),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24.0 * scale,
+                          ),
+                          child: Text(
+                            _loadError ?? 'Unknown error occurred',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.0 * scale,
+                              color: Colors.grey.shade600,
                             ),
-                          )
-                        : _pendingProfiles.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline,
-                                      size: 48.0 * scale,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                    SizedBox(height: 16.0 * scale),
-                                    Text(
-                                      'No pending profiles',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 16.0 * scale,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    SizedBox(height: 8.0 * scale),
-                                    Text(
-                                      'All submissions have been reviewed',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12.0 * scale,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: EdgeInsets.all(16.0 * scale),
-                                itemCount: _pendingProfiles.length,
-                                itemBuilder: (context, index) {
-                                  final profile = _pendingProfiles[index];
-                                  final docId = profile.tempIdFirebase ?? '';
-                          return _buildProfileCard(profile, docId, scale);
-                        },
-                      ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        SizedBox(height: 24.0 * scale),
+                        ElevatedButton.icon(
+                          onPressed: _loadPendingProfiles,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try Again'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: DAColors.primaryGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _pendingProfiles.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 48.0 * scale,
+                          color: Colors.grey.shade400,
+                        ),
+                        SizedBox(height: 16.0 * scale),
+                        Text(
+                          'No pending profiles',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.0 * scale,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        SizedBox(height: 8.0 * scale),
+                        Text(
+                          'All submissions have been reviewed',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.0 * scale,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.all(16.0 * scale),
+                    itemCount: _pendingProfiles.length,
+                    itemBuilder: (context, index) {
+                      final profile = _pendingProfiles[index];
+                      final docId = profile.tempIdFirebase ?? '';
+                      return _buildProfileCard(profile, docId, scale);
+                    },
+                  ),
           ),
         ],
       ),
@@ -683,7 +696,8 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
                           color: Colors.grey.shade500,
                         ),
                       ),
-                      if (profile.enumeratorEmail != null && profile.enumeratorEmail!.isNotEmpty)
+                      if (profile.enumeratorEmail != null &&
+                          profile.enumeratorEmail!.isNotEmpty)
                         Padding(
                           padding: EdgeInsets.only(top: 4.0 * scale),
                           child: Text(
@@ -768,4 +782,4 @@ class _ProfileApprovalScreenState extends State<ProfileApprovalScreen>
       ),
     );
   }
-    }
+}

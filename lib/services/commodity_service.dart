@@ -19,6 +19,66 @@ class CommodityService {
     return _instance;
   }
 
+  String _normalizeKeyPart(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+    return normalized.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String _compositeCommodityKey(CommodityData data) {
+    return [
+      _normalizeKeyPart(data.type),
+      _normalizeKeyPart(data.commodity),
+      _normalizeKeyPart(data.saleMeth),
+      _normalizeKeyPart(data.productForm),
+      _normalizeKeyPart(data.pricingBasis),
+      _normalizeKeyPart(data.unit),
+    ].join('|');
+  }
+
+  DateTime _latestTimestamp(CommodityData data) {
+    return data.updatedAt ??
+        data.createdAt ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  CommodityData _mergeDuplicateCommodity(CommodityData a, CommodityData b) {
+    final winner = _latestTimestamp(a).isAfter(_latestTimestamp(b)) ? a : b;
+    final loser = identical(winner, a) ? b : a;
+    return winner.copyWith(
+      maleRequired: (a.maleRequired == true) || (b.maleRequired == true),
+      femaleRequired: (a.femaleRequired == true) || (b.femaleRequired == true),
+      totalWeightRequired:
+          (a.totalWeightRequired == true) || (b.totalWeightRequired == true),
+      totalPriceRequired:
+          (a.totalPriceRequired == true) || (b.totalPriceRequired == true),
+      expensesRequired:
+          (a.expensesRequired == true) || (b.expensesRequired == true),
+      remarks: (winner.remarks ?? '').trim().isNotEmpty
+          ? winner.remarks
+          : loser.remarks,
+      updatedAt: _latestTimestamp(winner),
+    );
+  }
+
+  DateTime? _parseDynamicTimestamp(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  String _compositeMapKey(Map<String, dynamic> data) {
+    return [
+      _normalizeKeyPart(data['type'] as String?),
+      _normalizeKeyPart(data['commodity'] as String?),
+      _normalizeKeyPart(data['saleMeth'] as String?),
+      _normalizeKeyPart(data['productForm'] as String?),
+      _normalizeKeyPart(data['pricingBasis'] as String?),
+      _normalizeKeyPart(data['unit'] as String?),
+    ].join('|');
+  }
+
   Future<void> _ensureCommodityAdminAccess() async {
     final user = _firebaseAuth.currentUser;
     if (user == null) {
@@ -167,15 +227,28 @@ class CommodityService {
       // Fetch all documents and sort client-side to avoid composite index requirement
       final snapshot = await _firestore.collection(_collectionName).get();
 
-      final commodities = <CommodityData>[];
+      final rawCommodities = <CommodityData>[];
       for (final doc in snapshot.docs) {
         try {
           final data = CommodityData.fromFirestore(doc.data(), doc.id);
-          commodities.add(data);
+          rawCommodities.add(data);
         } catch (e) {
           debugPrint('⚠️ Failed to parse commodity ${doc.id}: $e');
         }
       }
+
+      final dedupedByKey = <String, CommodityData>{};
+      for (final commodity in rawCommodities) {
+        final key = _compositeCommodityKey(commodity);
+        final existing = dedupedByKey[key];
+        if (existing == null) {
+          dedupedByKey[key] = commodity;
+        } else {
+          dedupedByKey[key] = _mergeDuplicateCommodity(existing, commodity);
+        }
+      }
+
+      final commodities = dedupedByKey.values.toList();
 
       // Sort by type, then commodity, then saleMeth, then productForm
       commodities.sort((a, b) {
@@ -188,7 +261,10 @@ class CommodityService {
         return (a.productForm ?? '').compareTo(b.productForm ?? '');
       });
 
-      debugPrint('✅ Loaded ${commodities.length} commodities (client-sorted)');
+      final removedCount = rawCommodities.length - commodities.length;
+      debugPrint(
+        '✅ Loaded ${commodities.length} commodities (client-sorted, removed $removedCount duplicate entries in-memory)',
+      );
 
       // Cache to local storage for offline use
       try {
@@ -296,6 +372,140 @@ class CommodityService {
     } catch (e) {
       debugPrint('❌ Error getting unique commodities: $e');
       return [];
+    }
+  }
+
+  /// Delete duplicate commodity documents in Firestore (admin only)
+  /// Duplicate key: type + commodity + saleMeth + productForm + pricingBasis + unit
+  /// Returns number of deleted documents.
+  Future<int> deleteDuplicateCommodities() async {
+    try {
+      await _ensureCommodityAdminAccess();
+
+      final snapshot = await _firestore.collection(_collectionName).get();
+      final docsByKey = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+      final mergedFlagsByKeeper = <String, Map<String, bool>>{};
+      final deleteIds = <String>[];
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final key = _compositeMapKey(data);
+        final existing = docsByKey[key];
+
+        if (existing == null) {
+          docsByKey[key] = doc;
+          mergedFlagsByKeeper[doc.id] = {
+            'maleRequired': data['maleRequired'] == true,
+            'femaleRequired': data['femaleRequired'] == true,
+            'totalWeightRequired': data['totalWeightRequired'] == true,
+            'totalPriceRequired': data['totalPriceRequired'] == true,
+            'expensesRequired': data['expensesRequired'] == true,
+          };
+          continue;
+        }
+
+        final existingData = existing.data();
+        final existingTs =
+            _parseDynamicTimestamp(existingData['updatedAt']) ??
+            _parseDynamicTimestamp(existingData['createdAt']) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final currentTs =
+            _parseDynamicTimestamp(data['updatedAt']) ??
+            _parseDynamicTimestamp(data['createdAt']) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+
+        QueryDocumentSnapshot<Map<String, dynamic>> keeper = existing;
+        QueryDocumentSnapshot<Map<String, dynamic>> duplicate = doc;
+        if (currentTs.isAfter(existingTs)) {
+          keeper = doc;
+          duplicate = existing;
+          docsByKey[key] = doc;
+        }
+
+        final keeperFlags =
+            mergedFlagsByKeeper[keeper.id] ??
+            {
+              'maleRequired': false,
+              'femaleRequired': false,
+              'totalWeightRequired': false,
+              'totalPriceRequired': false,
+              'expensesRequired': false,
+            };
+        keeperFlags['maleRequired'] =
+            keeperFlags['maleRequired'] == true ||
+            (existingData['maleRequired'] == true) ||
+            (data['maleRequired'] == true);
+        keeperFlags['femaleRequired'] =
+            keeperFlags['femaleRequired'] == true ||
+            (existingData['femaleRequired'] == true) ||
+            (data['femaleRequired'] == true);
+        keeperFlags['totalWeightRequired'] =
+            keeperFlags['totalWeightRequired'] == true ||
+            (existingData['totalWeightRequired'] == true) ||
+            (data['totalWeightRequired'] == true);
+        keeperFlags['totalPriceRequired'] =
+            keeperFlags['totalPriceRequired'] == true ||
+            (existingData['totalPriceRequired'] == true) ||
+            (data['totalPriceRequired'] == true);
+        keeperFlags['expensesRequired'] =
+            keeperFlags['expensesRequired'] == true ||
+            (existingData['expensesRequired'] == true) ||
+            (data['expensesRequired'] == true);
+        mergedFlagsByKeeper[keeper.id] = keeperFlags;
+
+        deleteIds.add(duplicate.id);
+      }
+
+      if (deleteIds.isEmpty) {
+        debugPrint('✅ No duplicate commodities found in Firestore');
+        return 0;
+      }
+
+      var batch = _firestore.batch();
+      var opCount = 0;
+
+      for (final entry in docsByKey.entries) {
+        final keeper = entry.value;
+        final flags = mergedFlagsByKeeper[keeper.id];
+        if (flags == null) continue;
+
+        batch.update(keeper.reference, {
+          'maleRequired': flags['maleRequired'] == true,
+          'femaleRequired': flags['femaleRequired'] == true,
+          'totalWeightRequired': flags['totalWeightRequired'] == true,
+          'totalPriceRequired': flags['totalPriceRequired'] == true,
+          'expensesRequired': flags['expensesRequired'] == true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        opCount++;
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = _firestore.batch();
+          opCount = 0;
+        }
+      }
+
+      for (final id in deleteIds) {
+        batch.delete(_firestore.collection(_collectionName).doc(id));
+        opCount++;
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = _firestore.batch();
+          opCount = 0;
+        }
+      }
+
+      if (opCount > 0) {
+        await batch.commit();
+      }
+
+      debugPrint(
+        '✅ Deleted ${deleteIds.length} duplicate commodity document(s)',
+      );
+      return deleteIds.length;
+    } catch (e) {
+      debugPrint('❌ Error deleting duplicate commodities: $e');
+      rethrow;
     }
   }
 

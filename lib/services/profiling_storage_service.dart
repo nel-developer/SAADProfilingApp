@@ -76,6 +76,13 @@ class ApprovalResult {
       'ApprovalResult(success: $success, error: $errorMessage)';
 }
 
+/// Result of loading data that indicates whether it came from server or local cache
+class DataLoadResult<T> {
+  final T data;
+  final bool fromCache;
+  DataLoadResult({required this.data, required this.fromCache});
+}
+
 /// ProfilingStorageService — Disk-only local storage + Firestore cloud sync
 /// No in-memory cache — files read/written directly to disk for lower memory footprint
 class ProfilingStorageService {
@@ -123,6 +130,115 @@ class ProfilingStorageService {
   }
 
   ProfilingStorageService._internal();
+
+  static const String _approvedFarmersPrefsKey = 'approved_farmers_basic_info';
+
+  /// Save approved farmers basic info locally for offline Existing Farmer lookup.
+  /// Deduplicates by SAAD I.D No — newest record wins.
+  Future<void> saveApprovedFarmersLocally(List<ProfilingData> profiles) async {
+    try {
+      // Deduplicate by SAAD ID — keep the most recently updated entry
+      final byId = <String, ProfilingData>{};
+      for (final p in profiles) {
+        final saadId = p.saadIdNo?.trim() ?? '';
+        if (saadId.isEmpty) continue;
+        final existing = byId[saadId];
+        if (existing == null ||
+            (p.updatedAt ?? DateTime(1970)).isAfter(
+              existing.updatedAt ?? DateTime(1970),
+            )) {
+          byId[saadId] = p;
+        }
+      }
+
+      // Store only the basic fields needed for prefill
+      final list = byId.values
+          .map(
+            (p) => <String, dynamic>{
+              'saadIdNo': p.saadIdNo,
+              'rsbsaFishrIdNo': p.rsbsaFishrIdNo,
+              'firstName': p.firstName,
+              'middleName': p.middleName,
+              'surname': p.surname,
+              'extensionName': p.extensionName,
+              'region': p.region,
+              'province': p.province,
+              'municipality': p.municipality,
+              'barangay': p.barangay,
+              'sitioPurok': p.sitioPurok,
+              'dateOfBirth': p.dateOfBirth,
+              'sex': p.sex,
+              'isIndigenous': p.isIndigenous,
+              'isPWD': p.isPWD,
+              'spouseName': p.spouseName,
+              'updatedAt': p.updatedAt?.toIso8601String(),
+            },
+          )
+          .toList();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_approvedFarmersPrefsKey, jsonEncode(list));
+      debugPrint(
+        '✅ Saved ${list.length} approved farmer(s) locally (deduped by SAAD ID)',
+      );
+    } catch (e) {
+      debugPrint('⚠️ Could not save approved farmers locally: $e');
+    }
+  }
+
+  /// Load approved farmers basic info from local storage.
+  Future<List<ProfilingData>> loadApprovedFarmersLocally() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_approvedFarmersPrefsKey);
+      if (raw == null || raw.trim().isEmpty) return [];
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+
+      final farmers = <ProfilingData>[];
+      for (final item in decoded) {
+        if (item is! Map<String, dynamic>) continue;
+        final data = ProfilingData();
+        data.saadIdNo = item['saadIdNo'];
+        data.rsbsaFishrIdNo = item['rsbsaFishrIdNo'];
+        data.firstName = item['firstName'];
+        data.middleName = item['middleName'];
+        data.surname = item['surname'];
+        data.extensionName = item['extensionName'];
+        data.region = item['region'];
+        data.province = item['province'];
+        data.municipality = item['municipality'];
+        data.barangay = item['barangay'];
+        data.sitioPurok = item['sitioPurok'];
+        data.dateOfBirth = item['dateOfBirth'];
+        data.sex = item['sex'];
+        data.isIndigenous = item['isIndigenous'];
+        data.isPWD = item['isPWD'];
+        data.spouseName = item['spouseName'];
+        if (item['updatedAt'] != null) {
+          data.updatedAt = DateTime.tryParse(item['updatedAt']);
+        }
+        final saadId = data.saadIdNo?.trim() ?? '';
+        if (saadId.isNotEmpty) {
+          farmers.add(data);
+        }
+      }
+
+      farmers.sort(
+        (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
+          a.updatedAt ?? DateTime(1970),
+        ),
+      );
+      debugPrint(
+        '📦 Loaded ${farmers.length} approved farmer(s) from local storage',
+      );
+      return farmers;
+    } catch (e) {
+      debugPrint('⚠️ Could not load approved farmers locally: $e');
+      return [];
+    }
+  }
 
   factory ProfilingStorageService() {
     return _instance;
@@ -1435,82 +1551,45 @@ class ProfilingStorageService {
     }
   }
 
-  /// Load profiles awaiting approval from pending collection (for admin)
+  /// Load profiles awaiting approval from pending collection (for admin).
+  /// Requires internet — server-only fetch.
   Future<List<ProfilingData>> loadPendingProfiles() async {
     try {
-      debugPrint(
-        '🔍 Querying profiling_pending collection for status="Pending Approval"...',
-      );
       final snapshot = await _firestore
           .collection('profiling_pending')
           .where('status', isEqualTo: 'Pending Approval')
-          .get();
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 20));
 
-      debugPrint('✅ Query returned ${snapshot.docs.length} document(s)');
-
-      // Debug: Show all docs in collection if no pending found
-      if (snapshot.docs.isEmpty) {
-        debugPrint(
-          '⚠️ No pending profiles found. Checking all documents in profiling_pending collection...',
-        );
-        final allDocs = await _firestore
-            .collection('profiling_pending')
-            .limit(5)
-            .get();
-        debugPrint(
-          '   Total docs in profiling_pending: ${allDocs.docs.length}',
-        );
-        for (final doc in allDocs.docs.take(3)) {
-          final docData = doc.data();
-          debugPrint(
-            '   - Doc ${doc.id}: status=${docData['status']}, firstName=${docData['firstName']}',
-          );
-        }
-      }
+      debugPrint(
+        '✅ Pending profiles loaded from server: ${snapshot.docs.length} doc(s)',
+      );
 
       final profiles = <ProfilingData>[];
       for (final doc in snapshot.docs) {
         try {
           final data = _jsonToProfilingData(doc.data());
           data.tempIdFirebase = doc.id;
+          final payload = doc.data();
+          if (payload.containsKey('enumeratorEmail')) {
+            data.enumeratorEmail = payload['enumeratorEmail'];
+          }
           profiles.add(data);
-          debugPrint(
-            '  ✓ Loaded: ${data.firstName} ${data.surname} (ID: ${doc.id})',
-          );
         } catch (parseError) {
           debugPrint('  ⚠️ Failed to parse document ${doc.id}: $parseError');
         }
       }
 
-      // Sort locally instead of in query to avoid needing composite index
       profiles.sort(
         (a, b) => (b.createdAt ?? DateTime(1970)).compareTo(
           a.createdAt ?? DateTime(1970),
         ),
       );
 
-      // Attempt to populate enumeratorEmail if present in raw docs
-      for (final doc in snapshot.docs) {
-        final idx = profiles.indexWhere((p) => p.tempIdFirebase == doc.id);
-        if (idx != -1) {
-          try {
-            final payload = doc.data();
-            if (payload.containsKey('enumeratorEmail')) {
-              profiles[idx].enumeratorEmail = payload['enumeratorEmail'];
-            }
-          } catch (_) {}
-        }
-      }
-
-      debugPrint(
-        '✅ Loaded ${profiles.length} pending profile(s) from Firestore',
-      );
+      debugPrint('✅ Loaded ${profiles.length} pending profile(s)');
       return profiles;
     } catch (e) {
       debugPrint('❌ Error loading pending profiles: $e');
-      debugPrint(
-        '   This could mean: 1) No internet, 2) Permissions issue, 3) No documents match query',
-      );
       return [];
     }
   }
@@ -1643,39 +1722,9 @@ class ProfilingStorageService {
   }
 
   /// Load approved farmer records for Existing Farmer prefill in Step 1.
-  /// Only returns records with non-empty SAAD I.D No.
+  /// Reads from locally saved basic info (saved via Download Basic Info).
   Future<List<ProfilingData>> loadExistingFarmersForPrefill() async {
-    try {
-      final snapshot = await _firestore
-          .collection('profiling_forms')
-          .where('status', isEqualTo: 'Approved')
-          .get()
-          .timeout(const Duration(seconds: 20));
-
-      final farmers = <ProfilingData>[];
-      for (final doc in snapshot.docs) {
-        try {
-          final data = _jsonToProfilingData(doc.data());
-          data.tempIdFirebase ??= doc.id;
-          final saadNo = data.saadIdNo?.trim() ?? '';
-          if (saadNo.isNotEmpty) {
-            farmers.add(data);
-          }
-        } catch (_) {
-          continue;
-        }
-      }
-
-      farmers.sort(
-        (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
-          a.updatedAt ?? DateTime(1970),
-        ),
-      );
-      return farmers;
-    } catch (e) {
-      debugPrint('❌ Error loading existing farmers for prefill: $e');
-      return [];
-    }
+    return loadApprovedFarmersLocally();
   }
 
   /// Reject a pending profile
@@ -1757,118 +1806,39 @@ class ProfilingStorageService {
   /// Load approved profiles from Firebase ONLY (profiling_forms collection)
   /// These are profiles that have been synced and approved by admin
   /// Do NOT mix with local data
+  /// Load approved profiles. Requires internet — server-only fetch.
   Future<List<ProfilingData>> loadApprovedProfiles(String userId) async {
     try {
-      debugPrint('🔍 Loading approved profiles for userId=$userId');
-      // Approved profiles are public — return all docs with status='Approved'
       final snapshot = await _firestore
           .collection('profiling_forms')
           .where('status', isEqualTo: 'Approved')
-          .get();
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 20));
 
       debugPrint(
-        '   Query returned ${snapshot.docs.length} approved doc(s) for userId=$userId',
+        '✅ Approved profiles loaded from server: ${snapshot.docs.length} doc(s)',
       );
-      if (snapshot.docs.isEmpty) {
-        debugPrint(
-          '   ⚠️ No approved docs for this userId. Trying enumeratorEmail fallback...',
-        );
-        // Try fallback: search by enumeratorEmail == current user's email
-        try {
-          final currentEmail = FirebaseAuth.instance.currentUser?.email;
-          if (currentEmail != null && currentEmail.isNotEmpty) {
-            final byEmail = await _firestore
-                .collection('profiling_forms')
-                .where('enumeratorEmail', isEqualTo: currentEmail)
-                .where('status', isEqualTo: 'Approved')
-                .get();
-            debugPrint(
-              '   Fallback by enumeratorEmail returned ${byEmail.docs.length} doc(s)',
-            );
-            if (byEmail.docs.isNotEmpty) {
-              // Use the email-matched docs as our snapshot for processing below
-              // Reassign snapshot variable via a new local list of docs
-              final profiles = <ProfilingData>[];
-              for (final doc in byEmail.docs) {
-                try {
-                  final data = _jsonToProfilingData(doc.data());
-                  data.tempIdFirebase = doc.id;
-                  profiles.add(data);
-                  debugPrint(
-                    '  ✓ Loaded (email match): ${data.firstName} ${data.surname} (ID: ${doc.id})',
-                  );
-                } catch (parseError) {
-                  debugPrint(
-                    '  ⚠️ Failed to parse document ${doc.id}: $parseError',
-                  );
-                }
-              }
-              profiles.sort(
-                (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
-                  a.updatedAt ?? DateTime(1970),
-                ),
-              );
-              debugPrint(
-                '✅ Returning ${profiles.length} approved profile(s) via enumeratorEmail fallback',
-              );
-              return profiles;
-            }
-          }
-        } catch (e) {
-          debugPrint('   ⚠️ EnumeratorEmail fallback failed: $e');
-        }
-
-        debugPrint(
-          '   ⚠️ enumeratorEmail fallback found nothing — showing a small sample of approved docs for debugging:',
-        );
-        final sample = await _firestore
-            .collection('profiling_forms')
-            .where('status', isEqualTo: 'Approved')
-            .limit(5)
-            .get();
-        debugPrint('   Sample approved count: ${sample.docs.length}');
-        final sampleProfiles = <ProfilingData>[];
-        for (final doc in sample.docs) {
-          try {
-            final pdata = _jsonToProfilingData(doc.data());
-            pdata.tempIdFirebase = doc.id;
-            sampleProfiles.add(pdata);
-            debugPrint(
-              '     - Doc ${doc.id}: userId=${doc.data()['userId']}, enumerator=${doc.data()['enumeratorEmail']}, status=${doc.data()['status']}',
-            );
-          } catch (_) {}
-        }
-        if (sampleProfiles.isNotEmpty) {
-          sampleProfiles.sort(
-            (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
-              a.updatedAt ?? DateTime(1970),
-            ),
-          );
-          debugPrint(
-            '✅ Returning ${sampleProfiles.length} sample approved profile(s) as fallback',
-          );
-          return sampleProfiles;
-        }
-      }
 
       final profiles = <ProfilingData>[];
       for (final doc in snapshot.docs) {
-        final data = _jsonToProfilingData(doc.data());
-        data.tempIdFirebase = doc.id;
-        // Marked as approved by status in Firestore
-        profiles.add(data);
+        try {
+          final data = _jsonToProfilingData(doc.data());
+          data.tempIdFirebase = doc.id;
+          profiles.add(data);
+        } catch (parseError) {
+          debugPrint(
+            '  ⚠️ Failed to parse approved doc ${doc.id}: $parseError',
+          );
+        }
       }
 
-      // Sort: newest first
       profiles.sort(
         (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
           a.updatedAt ?? DateTime(1970),
         ),
       );
 
-      debugPrint(
-        '✅ Loaded ${profiles.length} approved profile(s) from Firebase for user $userId',
-      );
+      debugPrint('✅ Loaded ${profiles.length} approved profile(s) from server');
       return profiles;
     } catch (e) {
       debugPrint('❌ Error loading approved profiles: $e');
@@ -1887,11 +1857,13 @@ class ProfilingStorageService {
       final localDrafts = await loadDraftsFromDiskOnly();
 
       // 2) Firestore pending + approved
-      final pending = await loadPendingProfiles();
-      final approved = await loadApprovedProfiles(userId);
+      final pendingResult = await loadPendingProfiles();
+      final approvedResult = await loadApprovedProfiles(userId);
 
       // Filter pending to this user's uploads (pending loader does not filter by user)
-      final pendingForUser = pending.where((p) => p.userId == userId).toList();
+      final pendingForUser = pendingResult
+          .where((p) => p.userId == userId)
+          .toList();
 
       // Build maps by best-known id to avoid duplicates
       final Map<String, ProfilingData> merged = {};
@@ -1908,7 +1880,7 @@ class ProfilingStorageService {
       }
 
       // Add approved first (highest trust)
-      for (final a in approved) {
+      for (final a in approvedResult) {
         merged[keyFor(a)] = a;
       }
 

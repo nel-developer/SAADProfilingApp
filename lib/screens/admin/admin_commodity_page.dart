@@ -132,6 +132,33 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
     await _loadCommodities();
   }
 
+  Future<void> _removeDuplicateCommodities() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final removed = await _commodityService.deleteDuplicateCommodities();
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            removed > 0
+                ? '✅ Removed $removed duplicate commodity record(s)'
+                : '✅ No duplicate commodities found',
+          ),
+          backgroundColor: DAColors.primaryGreen,
+        ),
+      );
+      await _loadCommodities();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('❌ Failed to remove duplicates: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   double _scale(BuildContext context) {
     final scaleW = (MediaQuery.of(context).size.width / _refWidth).clamp(
       0.5,
@@ -384,11 +411,26 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openAddEditModal(null),
-        backgroundColor: DAColors.primaryGreen,
-        label: const Text('Add Commodity'),
-        icon: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'dedupe_commodity_fab',
+            onPressed: _removeDuplicateCommodities,
+            backgroundColor: Colors.blueGrey,
+            label: const Text('Remove Duplicates'),
+            icon: const Icon(Icons.cleaning_services_outlined),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'add_commodity_fab',
+            onPressed: () => _openAddEditModal(null),
+            backgroundColor: DAColors.primaryGreen,
+            label: const Text('Add Commodity'),
+            icon: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
@@ -417,11 +459,19 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if ((commodity.type ?? '').isNotEmpty) ...[
                             const SizedBox(width: 8),
-                            _buildTag(commodity.type!, Colors.teal),
+                            Flexible(
+                              child: _buildTag(
+                                commodity.type!,
+                                Colors.teal,
+                                maxWidth: 120,
+                              ),
+                            ),
                           ],
                         ],
                       ),
@@ -472,8 +522,9 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
     );
   }
 
-  Widget _buildTag(String label, Color color) {
+  Widget _buildTag(String label, Color color, {double? maxWidth}) {
     return Container(
+      constraints: maxWidth != null ? BoxConstraints(maxWidth: maxWidth) : null,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.2),
@@ -486,6 +537,8 @@ class _AdminCommodityPageState extends State<AdminCommodityPage>
           fontWeight: FontWeight.w600,
           color: color,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -545,6 +598,40 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   List<String> _productFormOptions = [];
   List<String> _pricingBasisOptions = [];
   List<String> _unitOptions = [];
+
+  String _normalizeValue(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+    return normalized.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  List<String> _uniqueNormalizedOptions(Iterable<String?> rawValues) {
+    final unique = <String>[];
+    final seen = <String>{};
+    for (final raw in rawValues) {
+      final trimmed = raw?.trim() ?? '';
+      if (trimmed.isEmpty) continue;
+      final key = _normalizeValue(trimmed);
+      if (key.isEmpty) continue;
+      if (seen.add(key)) {
+        unique.add(trimmed);
+      }
+    }
+    unique.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return unique;
+  }
+
+  String? _safeSelectedValue(String? selected, List<String> options) {
+    if (selected == null || options.isEmpty) return null;
+    final selectedKey = _normalizeValue(selected);
+    if (selectedKey.isEmpty) return null;
+    for (final option in options) {
+      if (_normalizeValue(option) == selectedKey) {
+        return option;
+      }
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -654,14 +741,19 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   Future<void> _loadCommodityOptions(String type) async {
     try {
       final commodities = await widget.commodityService.getAllCommodities();
-      final options = commodities
-          .where((c) => c.type == type)
-          .map((c) => c.commodity ?? '')
-          .where((c) => c.isNotEmpty)
-          .toSet()
-          .toList();
+      final options = _uniqueNormalizedOptions(
+        commodities
+            .where((c) => _normalizeValue(c.type) == _normalizeValue(type))
+            .map((c) => c.commodity),
+      );
       if (mounted) {
-        setState(() => _commodityOptions = options);
+        setState(() {
+          _commodityOptions = options;
+          _selectedCommodity = _safeSelectedValue(
+            _selectedCommodity,
+            _commodityOptions,
+          );
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading commodity options: $e');
@@ -671,14 +763,23 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   Future<void> _loadSaleMethodOptions(String type, String commodity) async {
     try {
       final commodities = await widget.commodityService.getAllCommodities();
-      final options = commodities
-          .where((c) => c.type == type && c.commodity == commodity)
-          .map((c) => c.saleMeth ?? '')
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList();
+      final options = _uniqueNormalizedOptions(
+        commodities
+            .where(
+              (c) =>
+                  _normalizeValue(c.type) == _normalizeValue(type) &&
+                  _normalizeValue(c.commodity) == _normalizeValue(commodity),
+            )
+            .map((c) => c.saleMeth),
+      );
       if (mounted) {
-        setState(() => _saleMethodOptions = options);
+        setState(() {
+          _saleMethodOptions = options;
+          _selectedSaleMethod = _safeSelectedValue(
+            _selectedSaleMethod,
+            _saleMethodOptions,
+          );
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading sale method options: $e');
@@ -692,19 +793,24 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   ) async {
     try {
       final commodities = await widget.commodityService.getAllCommodities();
-      final options = commodities
-          .where(
-            (c) =>
-                c.type == type &&
-                c.commodity == commodity &&
-                c.saleMeth == saleMethod,
-          )
-          .map((c) => c.productForm ?? '')
-          .where((p) => p.isNotEmpty)
-          .toSet()
-          .toList();
+      final options = _uniqueNormalizedOptions(
+        commodities
+            .where(
+              (c) =>
+                  _normalizeValue(c.type) == _normalizeValue(type) &&
+                  _normalizeValue(c.commodity) == _normalizeValue(commodity) &&
+                  _normalizeValue(c.saleMeth) == _normalizeValue(saleMethod),
+            )
+            .map((c) => c.productForm),
+      );
       if (mounted) {
-        setState(() => _productFormOptions = options);
+        setState(() {
+          _productFormOptions = options;
+          _selectedProductForm = _safeSelectedValue(
+            _selectedProductForm,
+            _productFormOptions,
+          );
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading product form options: $e');
@@ -719,20 +825,26 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   ) async {
     try {
       final commodities = await widget.commodityService.getAllCommodities();
-      final options = commodities
-          .where(
-            (c) =>
-                c.type == type &&
-                c.commodity == commodity &&
-                c.saleMeth == saleMethod &&
-                c.productForm == productForm,
-          )
-          .map((c) => c.pricingBasis ?? '')
-          .where((p) => p.isNotEmpty)
-          .toSet()
-          .toList();
+      final options = _uniqueNormalizedOptions(
+        commodities
+            .where(
+              (c) =>
+                  _normalizeValue(c.type) == _normalizeValue(type) &&
+                  _normalizeValue(c.commodity) == _normalizeValue(commodity) &&
+                  _normalizeValue(c.saleMeth) == _normalizeValue(saleMethod) &&
+                  _normalizeValue(c.productForm) ==
+                      _normalizeValue(productForm),
+            )
+            .map((c) => c.pricingBasis),
+      );
       if (mounted) {
-        setState(() => _pricingBasisOptions = options);
+        setState(() {
+          _pricingBasisOptions = options;
+          _selectedPricingBasis = _safeSelectedValue(
+            _selectedPricingBasis,
+            _pricingBasisOptions,
+          );
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading pricing basis options: $e');
@@ -748,21 +860,25 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   ) async {
     try {
       final commodities = await widget.commodityService.getAllCommodities();
-      final options = commodities
-          .where(
-            (c) =>
-                c.type == type &&
-                c.commodity == commodity &&
-                c.saleMeth == saleMethod &&
-                c.productForm == productForm &&
-                c.pricingBasis == pricingBasis,
-          )
-          .map((c) => c.unit ?? '')
-          .where((u) => u.isNotEmpty)
-          .toSet()
-          .toList();
+      final options = _uniqueNormalizedOptions(
+        commodities
+            .where(
+              (c) =>
+                  _normalizeValue(c.type) == _normalizeValue(type) &&
+                  _normalizeValue(c.commodity) == _normalizeValue(commodity) &&
+                  _normalizeValue(c.saleMeth) == _normalizeValue(saleMethod) &&
+                  _normalizeValue(c.productForm) ==
+                      _normalizeValue(productForm) &&
+                  _normalizeValue(c.pricingBasis) ==
+                      _normalizeValue(pricingBasis),
+            )
+            .map((c) => c.unit),
+      );
       if (mounted) {
-        setState(() => _unitOptions = options);
+        setState(() {
+          _unitOptions = options;
+          _selectedUnit = _safeSelectedValue(_selectedUnit, _unitOptions);
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading unit options: $e');
@@ -785,88 +901,95 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       title: Text(
         widget.commodityData == null ? 'Add Commodity' : 'Edit Commodity',
       ),
-      content: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (widget.commodityData == null) ...[
-                // Add mode - dropdown with optional custom input
-                _buildFlexibleTypeField(),
-                _buildFlexibleCommodityField(),
-                _buildFlexibleSaleMethodField(),
-                _buildFlexibleProductFormField(),
-                _buildFlexiblePricingBasisField(),
-                _buildFlexibleUnitField(),
-              ] else ...[
-                // Edit mode - use cascading dropdowns from existing records
-                _buildTypeDropdown(),
-                const SizedBox(height: 12),
-                if (_selectedType != null) ...[
-                  _buildCommodityDropdown(),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.70,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.commodityData == null) ...[
+                  // Add mode - dropdown with optional custom input
+                  _buildFlexibleTypeField(),
+                  _buildFlexibleCommodityField(),
+                  _buildFlexibleSaleMethodField(),
+                  _buildFlexibleProductFormField(),
+                  _buildFlexiblePricingBasisField(),
+                  _buildFlexibleUnitField(),
+                ] else ...[
+                  // Edit mode - use cascading dropdowns from existing records
+                  _buildTypeDropdown(),
                   const SizedBox(height: 12),
+                  if (_selectedType != null) ...[
+                    _buildCommodityDropdown(),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_selectedType != null && _selectedCommodity != null) ...[
+                    _buildSaleMethodDropdown(),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_selectedType != null &&
+                      _selectedCommodity != null &&
+                      _selectedSaleMethod != null) ...[
+                    _buildProductFormDropdown(),
+                    const SizedBox(height: 12),
+                  ],
                 ],
-                if (_selectedType != null && _selectedCommodity != null) ...[
-                  _buildSaleMethodDropdown(),
-                  const SizedBox(height: 12),
-                ],
-                if (_selectedType != null &&
-                    _selectedCommodity != null &&
-                    _selectedSaleMethod != null) ...[
-                  _buildProductFormDropdown(),
-                  const SizedBox(height: 12),
-                ],
-              ],
 
-              if (widget.commodityData != null) ...[
-                _buildTextField(
-                  'Pricing Basis',
-                  _pricingBasisController,
-                  'Per Head, Per Kilogram, etc.',
+                if (widget.commodityData != null) ...[
+                  _buildTextField(
+                    'Pricing Basis',
+                    _pricingBasisController,
+                    'Per Head, Per Kilogram, etc.',
+                  ),
+                  _buildTextField(
+                    'Unit',
+                    _unitController,
+                    'Head, Kilograms, Liters, etc.',
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Text(
+                  'Field Requirements (Checkboxes)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-                _buildTextField(
-                  'Unit',
-                  _unitController,
-                  'Head, Kilograms, Liters, etc.',
+                const SizedBox(height: 8),
+                _buildCheckbox('Male Required', _data.maleRequired ?? false, (
+                  val,
+                ) {
+                  setState(() => _data.maleRequired = val);
+                }),
+                _buildCheckbox(
+                  'Female Required',
+                  _data.femaleRequired ?? false,
+                  (val) {
+                    setState(() => _data.femaleRequired = val);
+                  },
                 ),
+                _buildCheckbox(
+                  'Total Weight Required',
+                  _data.totalWeightRequired ?? false,
+                  (val) {
+                    setState(() => _data.totalWeightRequired = val);
+                  },
+                ),
+                _buildLockedRequiredCheckbox('Total Price Required'),
+                _buildLockedRequiredCheckbox('Expenses Required'),
               ],
-              const SizedBox(height: 16),
-              Text(
-                'Field Requirements (Checkboxes)',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildCheckbox('Male Required', _data.maleRequired ?? false, (
-                val,
-              ) {
-                setState(() => _data.maleRequired = val);
-              }),
-              _buildCheckbox('Female Required', _data.femaleRequired ?? false, (
-                val,
-              ) {
-                setState(() => _data.femaleRequired = val);
-              }),
-              _buildCheckbox(
-                'Total Weight Required',
-                _data.totalWeightRequired ?? false,
-                (val) {
-                  setState(() => _data.totalWeightRequired = val);
-                },
-              ),
-              _buildLockedRequiredCheckbox('Total Price Required'),
-              _buildLockedRequiredCheckbox('Expenses Required'),
-            ],
+            ),
           ),
         ),
       ),
@@ -1002,6 +1125,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildTypeDropdown() {
+    final safeType = _safeSelectedValue(_selectedType, _typeOptions);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -1016,7 +1140,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _selectedType,
+            initialValue: safeType,
             items: _typeOptions
                 .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                 .toList(),
@@ -1051,7 +1175,11 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildFlexibleTypeField() {
-    final items = [..._typeOptions, 'Add New Type...'];
+    final items = [
+      ..._uniqueNormalizedOptions(_typeOptions),
+      'Add New Type...',
+    ];
+    final safeType = _safeSelectedValue(_selectedType, _typeOptions);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1067,7 +1195,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _isCustomType ? _customOption : _selectedType,
+            initialValue: _isCustomType ? _customOption : safeType,
             items: [
               ...items.map(
                 (type) => DropdownMenuItem(
@@ -1135,7 +1263,14 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildFlexibleCommodityField() {
-    final commodityItems = [..._commodityOptions, 'Add New Commodity...'];
+    final commodityItems = [
+      ..._uniqueNormalizedOptions(_commodityOptions),
+      'Add New Commodity...',
+    ];
+    final safeCommodity = _safeSelectedValue(
+      _selectedCommodity,
+      _commodityOptions,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1151,9 +1286,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _isCustomCommodity
-                ? _customOption
-                : _selectedCommodity,
+            initialValue: _isCustomCommodity ? _customOption : safeCommodity,
             items: [
               ...commodityItems.map(
                 (commodity) => DropdownMenuItem(
@@ -1221,7 +1354,14 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildFlexibleSaleMethodField() {
-    final saleMethodItems = [..._saleMethodOptions, 'Add New Sale Method...'];
+    final saleMethodItems = [
+      ..._uniqueNormalizedOptions(_saleMethodOptions),
+      'Add New Sale Method...',
+    ];
+    final safeSaleMethod = _safeSelectedValue(
+      _selectedSaleMethod,
+      _saleMethodOptions,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1237,9 +1377,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _isCustomSaleMethod
-                ? _customOption
-                : _selectedSaleMethod,
+            initialValue: _isCustomSaleMethod ? _customOption : safeSaleMethod,
             items: [
               ...saleMethodItems.map(
                 (method) => DropdownMenuItem(
@@ -1309,9 +1447,13 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
 
   Widget _buildFlexibleProductFormField() {
     final productFormItems = [
-      ..._productFormOptions,
+      ..._uniqueNormalizedOptions(_productFormOptions),
       'Add New Product Form...',
     ];
+    final safeProductForm = _safeSelectedValue(
+      _selectedProductForm,
+      _productFormOptions,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1329,7 +1471,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           DropdownButtonFormField<String>(
             initialValue: _isCustomProductForm
                 ? _customOption
-                : _selectedProductForm,
+                : safeProductForm,
             items: [
               ...productFormItems.map(
                 (form) => DropdownMenuItem(
@@ -1397,9 +1539,13 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
 
   Widget _buildFlexiblePricingBasisField() {
     final pricingBasisItems = [
-      ..._pricingBasisOptions,
+      ..._uniqueNormalizedOptions(_pricingBasisOptions),
       'Add New Pricing Basis...',
     ];
+    final safePricingBasis = _safeSelectedValue(
+      _selectedPricingBasis,
+      _pricingBasisOptions,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1417,7 +1563,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           DropdownButtonFormField<String>(
             initialValue: _isCustomPricingBasis
                 ? _customOption
-                : _selectedPricingBasis,
+                : safePricingBasis,
             items: [
               ...pricingBasisItems.map(
                 (basis) => DropdownMenuItem(
@@ -1482,7 +1628,11 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildFlexibleUnitField() {
-    final unitItems = [..._unitOptions, 'Add New Unit...'];
+    final unitItems = [
+      ..._uniqueNormalizedOptions(_unitOptions),
+      'Add New Unit...',
+    ];
+    final safeUnit = _safeSelectedValue(_selectedUnit, _unitOptions);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1498,7 +1648,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _isCustomUnit ? _customOption : _selectedUnit,
+            initialValue: _isCustomUnit ? _customOption : safeUnit,
             items: [
               ...unitItems.map(
                 (unit) => DropdownMenuItem(
@@ -1543,6 +1693,10 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildCommodityDropdown() {
+    final safeCommodity = _safeSelectedValue(
+      _selectedCommodity,
+      _commodityOptions,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -1557,7 +1711,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _selectedCommodity,
+            initialValue: safeCommodity,
             items: _commodityOptions
                 .map(
                   (commodity) => DropdownMenuItem(
@@ -1603,6 +1757,10 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildSaleMethodDropdown() {
+    final safeSaleMethod = _safeSelectedValue(
+      _selectedSaleMethod,
+      _saleMethodOptions,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -1617,7 +1775,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _selectedSaleMethod,
+            initialValue: safeSaleMethod,
             items: _saleMethodOptions
                 .map(
                   (method) =>
@@ -1665,6 +1823,10 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
   }
 
   Widget _buildProductFormDropdown() {
+    final safeProductForm = _safeSelectedValue(
+      _selectedProductForm,
+      _productFormOptions,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -1679,7 +1841,7 @@ class _CommodityEditModalState extends State<_CommodityEditModal> {
           ),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            initialValue: _selectedProductForm,
+            initialValue: safeProductForm,
             items: _productFormOptions
                 .map((form) => DropdownMenuItem(value: form, child: Text(form)))
                 .toList(),

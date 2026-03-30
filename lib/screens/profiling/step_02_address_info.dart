@@ -47,10 +47,12 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
   List<String> _barangays = [];
 
   bool _locationsLoaded = false;
+  bool _isHydratingAddressData = false;
 
   @override
   void initState() {
     super.initState();
+    _loadDataAndPopulateDropdowns();
     // Add listeners only once in initState to prevent duplicates
     _regionCtrl.addListener(_autoSaveToCurrentData);
     _provinceCtrl.addListener(_autoSaveToCurrentData);
@@ -58,7 +60,6 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
     _barangayCtrl.addListener(_autoSaveToCurrentData);
     _sitioPurokCtrl.addListener(_autoSaveToCurrentData);
     _dateOfBirthCtrl.addListener(_autoSaveToCurrentData);
-    _loadDataAndPopulateDropdowns();
   }
 
   @override
@@ -104,6 +105,8 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
   }
 
   void _loadDataAndPopulateDropdowns() {
+    _isHydratingAddressData = true;
+
     // Prefill from shared currentData if available
     if (widget.currentData != null) {
       _regionCtrl.text = widget.currentData!.region ?? '';
@@ -133,9 +136,12 @@ class _Step02AddressInfoState extends State<Step02AddressInfo> {
 
       _populateDropdownsForCurrentData();
     }
+
+    _isHydratingAddressData = false;
   }
 
   void _autoSaveToCurrentData() {
+    if (_isHydratingAddressData) return;
     if (widget.currentData != null) {
       widget.currentData!.region = _regionCtrl.text.trim();
       widget.currentData!.province = _provinceCtrl.text.trim();

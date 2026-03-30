@@ -40,6 +40,40 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
   final LocalCommodityCache _cache = LocalCommodityCache();
   List<String> _typeOptions = [];
 
+  String _normalizeValue(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+    return normalized.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  List<String> _uniqueOptions(Iterable<String?> rawValues) {
+    final output = <String>[];
+    final seen = <String>{};
+    for (final raw in rawValues) {
+      final value = raw?.trim() ?? '';
+      if (value.isEmpty) continue;
+      final key = _normalizeValue(value);
+      if (key.isEmpty) continue;
+      if (seen.add(key)) {
+        output.add(value);
+      }
+    }
+    output.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return output;
+  }
+
+  String? _safeSelectedValue(String? selected, List<String> items) {
+    if (selected == null || items.isEmpty) return null;
+    final selectedKey = _normalizeValue(selected);
+    if (selectedKey.isEmpty) return null;
+    for (final item in items) {
+      if (_normalizeValue(item) == selectedKey) {
+        return item;
+      }
+    }
+    return null;
+  }
+
   Set<String> _parseCsvToSet(String? value) {
     if (value == null || value.trim().isEmpty) return <String>{};
     return value
@@ -67,7 +101,17 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
 
   void _loadCachedCommodities() {
     try {
-      _typeOptions = _cache.getTypes();
+      _typeOptions = _uniqueOptions(_cache.getTypes());
+      _primaryCommodity = _safeSelectedValue(_primaryCommodity, _typeOptions);
+      _receivedPrimary = _safeSelectedValue(_receivedPrimary, _typeOptions);
+      _selectedSecondaryOptions = _selectedSecondaryOptions
+          .map((item) => _safeSelectedValue(item, _typeOptions))
+          .whereType<String>()
+          .toSet();
+      _receivedSecondaryOptions = _receivedSecondaryOptions
+          .map((item) => _safeSelectedValue(item, _typeOptions))
+          .whereType<String>()
+          .toSet();
       debugPrint('📦 Step 6 loaded types: $_typeOptions');
       setState(() {});
     } catch (e) {
@@ -343,6 +387,8 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final uniqueItems = _uniqueOptions(items);
+    final safeValue = _safeSelectedValue(value, uniqueItems);
     return Container(
       decoration: BoxDecoration(
         color: DAColors.white,
@@ -362,7 +408,7 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
         ],
       ),
       child: DropdownButtonFormField<String>(
-        initialValue: value,
+        initialValue: safeValue,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.poppins(
@@ -396,8 +442,11 @@ class _Step06MainCommodityState extends State<Step06MainCommodity> {
         ),
         dropdownColor: DAColors.white,
         icon: Icon(Icons.arrow_drop_down, color: DAColors.black),
-        items: items.map((String item) {
-          return DropdownMenuItem<String>(value: item, child: Text(item));
+        items: uniqueItems.map((String item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item, overflow: TextOverflow.ellipsis, maxLines: 1),
+          );
         }).toList(),
         onChanged: onChanged,
       ),

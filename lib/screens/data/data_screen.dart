@@ -60,14 +60,13 @@ class _DataScreenState extends State<DataScreen>
       return false;
     }
 
-    // Unsync tab is local-history view: include finalized local records,
-    // even if already synced (Pending/Approved), so users can still view
-    // their local copy and its status marker.
+    // Show finalized local records that haven't been approved yet.
+    // Approved profiles (e.g. auto-approved existing farmer syncs) are
+    // excluded — they belong in the Approved tab only.
     if (status == 'unsync' ||
         status == 'unsynced' ||
         status == 'pending approval' ||
-        status == 'pending' ||
-        status == 'approved') {
+        status == 'pending') {
       return true;
     }
 
@@ -142,16 +141,29 @@ class _DataScreenState extends State<DataScreen>
 
   Future<void> _downloadApprovedBasicInformation() async {
     try {
+      if (!_isOnline) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '📴 You are offline. Connect to internet to download.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
       List<ProfilingData> approvedProfiles = [];
       final user = FirebaseAuth.instance.currentUser;
 
-      if (_isOnline && user != null) {
+      if (user != null) {
         approvedProfiles = await _storage.loadApprovedProfiles(user.uid);
-      } else {
-        approvedProfiles = _approvedData
-            .map((entry) => entry['data'])
-            .whereType<ProfilingData>()
-            .toList();
+      }
+
+      // Save locally for Existing Farmer prefill (deduplicates by SAAD ID)
+      if (approvedProfiles.isNotEmpty) {
+        await _storage.saveApprovedFarmersLocally(approvedProfiles);
       }
 
       if (approvedProfiles.isEmpty) {
@@ -255,15 +267,16 @@ class _DataScreenState extends State<DataScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Downloaded: $filePath'),
+          content: Text('✅ Download Complete\n$filePath'),
           backgroundColor: DAColors.primaryGreen,
+          duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to export approved basic info: $e'),
+          content: Text('❌ Download Failed: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -493,10 +506,10 @@ class _DataScreenState extends State<DataScreen>
         _loadingPending = true;
       });
 
-      List<ProfilingData> pendingDrafts = [];
+      List<ProfilingData> pendingDrafts;
       try {
         pendingDrafts = await _storage.loadPendingProfiles().timeout(
-          const Duration(seconds: 15),
+          const Duration(seconds: 20),
         );
       } on TimeoutException {
         if (mounted) {
@@ -514,9 +527,6 @@ class _DataScreenState extends State<DataScreen>
         }
         return;
       }
-      debugPrint(
-        '✅ Loaded ${pendingDrafts.length} pending profile(s) from Firebase',
-      );
 
       if (mounted) {
         final newList = pendingDrafts.map((d) {
@@ -551,11 +561,11 @@ class _DataScreenState extends State<DataScreen>
 
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        List<ProfilingData> approvedDrafts = [];
+        List<ProfilingData> approvedDrafts;
         try {
           approvedDrafts = await _storage
               .loadApprovedProfiles(user.uid)
-              .timeout(const Duration(seconds: 15));
+              .timeout(const Duration(seconds: 20));
         } on TimeoutException {
           if (mounted) {
             setState(() {
@@ -572,10 +582,6 @@ class _DataScreenState extends State<DataScreen>
           }
           return;
         }
-
-        debugPrint(
-          '✅ Loaded ${approvedDrafts.length} approved profile(s) from Firebase',
-        );
 
         if (mounted) {
           final newList = approvedDrafts.map((d) {
@@ -1369,14 +1375,9 @@ class _DataScreenState extends State<DataScreen>
                         );
                         return;
                       }
-
                       setState(() {
                         _selectedFilter = 'Pending';
                       });
-                      // Lazy-load pending from Firebase only when tab clicked
-                      debugPrint(
-                        '📱 Pending tab selected - loading from Firebase...',
-                      );
                       _loadPendingProfiles();
                     },
                   ),
@@ -1398,14 +1399,9 @@ class _DataScreenState extends State<DataScreen>
                         );
                         return;
                       }
-
                       setState(() {
                         _selectedFilter = 'Approved';
                       });
-                      // Lazy-load approved from Firebase only when tab clicked
-                      debugPrint(
-                        '📱 Approved tab selected - loading from Firebase...',
-                      );
                       _loadApprovedProfiles();
                     },
                   ),

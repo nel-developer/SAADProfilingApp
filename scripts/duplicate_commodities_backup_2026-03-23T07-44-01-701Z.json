@@ -1,0 +1,800 @@
+[
+  {
+    "id": "54XT8C6kKIZzXrekRSNI",
+    "data": {
+      "type": "Fishing",
+      "commodity": "Fish Capture",
+      "saleMeth": "Capture",
+      "productForm": "Live weight",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 536000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 536000000
+      }
+    }
+  },
+  {
+    "id": "8Rbg5KJ3C6rEYm3yFIJQ",
+    "data": {
+      "type": "Fishing",
+      "commodity": "Fishing",
+      "saleMeth": "Post-harvest",
+      "productForm": "Bottled/Canned Fish",
+      "pricingBasis": "Per Piece",
+      "unit": "Pieces",
+      "createdAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 644000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 644000000
+      }
+    }
+  },
+  {
+    "id": "FZqgmeOFjXFBbIvClo4A",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Goat",
+      "saleMeth": "Meat Retail",
+      "productForm": "Retailed Goat Cuts",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 541000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 541000000
+      }
+    }
+  },
+  {
+    "id": "HeEcCnsX8TczStZzl5u4",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Goat",
+      "saleMeth": "Service",
+      "productForm": "Stud",
+      "pricingBasis": "Per Service",
+      "unit": "Service",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 602000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 602000000
+      }
+    }
+  },
+  {
+    "id": "8vxjNoElNf0GvzoWKDi5",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Cattle",
+      "saleMeth": "Live Animal",
+      "productForm": "Calf",
+      "pricingBasis": "Per Head",
+      "unit": "Head",
+      "createdAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 936000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 936000000
+      }
+    }
+  },
+  {
+    "id": "JjFjkyTini5oNLWaUIqv",
+    "data": {
+      "type": "Rice",
+      "commodity": "Rice",
+      "saleMeth": "Fresh Produce",
+      "productForm": "Fresh Palay",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 774000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 774000000
+      }
+    }
+  },
+  {
+    "id": "N6ECkWaVW5I7kGvyL1q0",
+    "data": {
+      "type": "Fishing",
+      "commodity": "Fishing",
+      "saleMeth": "Post-harvest",
+      "productForm": "Dried Fish",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 595000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 595000000
+      }
+    }
+  },
+  {
+    "id": "NNChLbu6QhF6rsIIVBTX",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Carabao",
+      "saleMeth": "Service",
+      "productForm": "Draft",
+      "pricingBasis": "Per Service",
+      "unit": "Service",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 866000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 866000000
+      }
+    }
+  },
+  {
+    "id": "1Pz0ntrcV93j62w4Sppi",
+    "data": {
+      "type": "Rice",
+      "commodity": "Rice",
+      "saleMeth": "Processed",
+      "productForm": "Dried Palay",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 893000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 893000000
+      }
+    }
+  },
+  {
+    "id": "0bcFrY3WMIXyYfHG5Pb5",
+    "data": {
+      "type": "Rice",
+      "commodity": "Rice",
+      "saleMeth": "Milled",
+      "productForm": "Rice",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 952000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 952000000
+      }
+    }
+  },
+  {
+    "id": "Ps8xeXrTSikoDcruKQSG",
+    "data": {
+      "type": "Rice",
+      "commodity": "Rice",
+      "saleMeth": "Milled",
+      "productForm": "Rice",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 895000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 895000000
+      }
+    }
+  },
+  {
+    "id": "Q7LB2vWZsEztUWQq2vSK",
+    "data": {
+      "type": "Rice",
+      "commodity": "Rice",
+      "saleMeth": "Fresh Produce",
+      "productForm": "Fresh Palay",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 806000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 806000000
+      }
+    }
+  },
+  {
+    "id": "Ry0404Mkbfphp9cN6YKw",
+    "data": {
+      "type": "High Value Crops",
+      "commodity": "Coconut",
+      "saleMeth": "Service",
+      "productForm": "Copra Processing",
+      "pricingBasis": "Per Service",
+      "unit": "Service",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 475000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 475000000
+      }
+    }
+  },
+  {
+    "id": "TGl2c6S04QTEnDMf3Ovq",
+    "data": {
+      "type": "Rice",
+      "commodity": "Rice",
+      "saleMeth": "Processed",
+      "productForm": "Dried Palay",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 834000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 834000000
+      }
+    }
+  },
+  {
+    "id": "MZQzHF0ozLoDIrxxXlZ5",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Meat Retail",
+      "productForm": "Pork Cuts",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 657000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 657000000
+      }
+    }
+  },
+  {
+    "id": "YwrJ0fcSydo3ymEAjjBy",
+    "data": {
+      "type": "Corn",
+      "commodity": "Corn",
+      "saleMeth": "Fresh Produce",
+      "productForm": "Corn",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810819,
+        "_nanoseconds": 9000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810819,
+        "_nanoseconds": 9000000
+      }
+    }
+  },
+  {
+    "id": "ZROuADXenwm1HBuQy94F",
+    "data": {
+      "type": "High Value Crops",
+      "commodity": "Coconut",
+      "saleMeth": "Product",
+      "productForm": "Coconut",
+      "pricingBasis": "Per Piece",
+      "unit": "Pieces",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 314000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 315000000
+      }
+    }
+  },
+  {
+    "id": "G6UnLPWXqlFSPdd4Whd5",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Carabao",
+      "saleMeth": "Service",
+      "productForm": "Stud",
+      "pricingBasis": "Per Service",
+      "unit": "Service",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 796000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 796000000
+      }
+    }
+  },
+  {
+    "id": "8mqOY8m84g1nMRacahHI",
+    "data": {
+      "type": "Poultry",
+      "commodity": "Chicken",
+      "saleMeth": "Live Animal",
+      "productForm": "Live weight",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 923000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 923000000
+      }
+    }
+  },
+  {
+    "id": "fQzvpk3tCxq2bMr7xSga",
+    "data": {
+      "type": "Corn",
+      "commodity": "Corn",
+      "saleMeth": "Fresh Produce",
+      "productForm": "Corn",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 952000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 952000000
+      }
+    }
+  },
+  {
+    "id": "h5BwZcWZTqhKSc7BYCJO",
+    "data": {
+      "type": "Fishing",
+      "commodity": "Fishing",
+      "saleMeth": "Post-harvest",
+      "productForm": "Dried Fish",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 585000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810822,
+        "_nanoseconds": 585000000
+      }
+    }
+  },
+  {
+    "id": "hReJAgBGX7xaxQFwekNa",
+    "data": {
+      "type": "Fishing",
+      "commodity": "Fishing",
+      "saleMeth": "Post-harvest",
+      "productForm": "Bottled/Canned Fish",
+      "pricingBasis": "Per Piece",
+      "unit": "Pieces",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 656000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 656000000
+      }
+    }
+  },
+  {
+    "id": "ik3QrI2CTDdmOHEsFVfL",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Cattle",
+      "saleMeth": "Live Animal",
+      "productForm": "Live weight",
+      "pricingBasis": "Per Head",
+      "unit": "Head",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 86000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 86000000
+      }
+    }
+  },
+  {
+    "id": "m8AI0YLFzG8QOJQy5LiM",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Live Animal",
+      "productForm": "Fattener",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 348000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 348000000
+      }
+    }
+  },
+  {
+    "id": "jEzZSKpVXKaJ4Rb5BqV6",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Carabao",
+      "saleMeth": "Live Animal",
+      "productForm": "Live weight",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 737000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 737000000
+      }
+    }
+  },
+  {
+    "id": "k6gBbpi7twbqjoCvcoGF",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Cattle",
+      "saleMeth": "Service",
+      "productForm": "Stud",
+      "pricingBasis": "Per Service",
+      "unit": "Service",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 309000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 309000000
+      }
+    }
+  },
+  {
+    "id": "O6WZMeNReUgelS5ISaLZ",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Carabao",
+      "saleMeth": "By-product",
+      "productForm": "Milk",
+      "pricingBasis": "Bottle",
+      "unit": "Litters",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 663000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 663000000
+      }
+    }
+  },
+  {
+    "id": "hvPjJDXJtJIZYVgPfIvf",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Cattle",
+      "saleMeth": "Meat Retail",
+      "productForm": "Beef Cuts",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 191000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 191000000
+      }
+    }
+  },
+  {
+    "id": "pEcVsYUWlPM45mIZ2reo",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Live Animal",
+      "productForm": "Fattener",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "maleRequired": true,
+      "femaleRequired": true,
+      "totalWeightRequired": true,
+      "totalPriceRequired": true,
+      "expensesRequired": true,
+      "remarks": "",
+      "createdAt": "2026-02-18T09:14:35.940",
+      "updatedAt": "2026-02-18T09:14:35.940"
+    }
+  },
+  {
+    "id": "phfbUoy1bA8wZyJFxLS5",
+    "data": {
+      "type": "High Value Crops",
+      "commodity": "Any Fruits",
+      "saleMeth": "Fresh Produce",
+      "productForm": "Fresh Fruit",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 199000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 199000000
+      }
+    }
+  },
+  {
+    "id": "qSqWqunOC94mxhjLYE8U",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Goat",
+      "saleMeth": "Live Animal",
+      "productForm": "Kid",
+      "pricingBasis": "Per Head",
+      "unit": "Head",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 402000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 402000000
+      }
+    }
+  },
+  {
+    "id": "quyzzMYAbmIogo8pI8Nh",
+    "data": {
+      "type": "Poultry",
+      "commodity": "Chicken",
+      "saleMeth": "Meat Retail",
+      "productForm": "Chicken Cuts",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 995000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 995000000
+      }
+    }
+  },
+  {
+    "id": "GxShwXq8fc7e1aDop671",
+    "data": {
+      "type": "High Value Crops",
+      "commodity": "Coconut",
+      "saleMeth": "By-product",
+      "productForm": "Copra",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 376000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 376000000
+      }
+    }
+  },
+  {
+    "id": "ryyV0jVPZP5iTWSisNNY",
+    "data": {
+      "type": "Poultry",
+      "commodity": "Chicken",
+      "saleMeth": "Meat Retail",
+      "productForm": "Dressed Chicken",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 54000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 54000000
+      }
+    }
+  },
+  {
+    "id": "HAnZP9fi7DZLwA8J8coN",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Live Animal",
+      "productForm": "Weaner",
+      "pricingBasis": "Per Head",
+      "unit": "Head",
+      "maleRequired": true,
+      "femaleRequired": true,
+      "totalWeightRequired": true,
+      "totalPriceRequired": true,
+      "expensesRequired": true,
+      "remarks": "",
+      "createdAt": "2026-02-16T16:27:48.316",
+      "updatedAt": "2026-02-16T16:27:48.316"
+    }
+  },
+  {
+    "id": "tTOL1KYlkzAXeyWhwD9s",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Live Animal",
+      "productForm": "Cull Animal",
+      "pricingBasis": "Per Head",
+      "unit": "Head",
+      "createdAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 537000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 537000000
+      }
+    }
+  },
+  {
+    "id": "tm1MRZhCVdViXYwYDKCz",
+    "data": {
+      "type": "High Value Crops",
+      "commodity": "Any Vegetable",
+      "saleMeth": "Fresh Produce",
+      "productForm": "Fresh Produce",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 257000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 257000000
+      }
+    }
+  },
+  {
+    "id": "tpFm1JEEDSgBJfmFotVR",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Live Animal",
+      "productForm": "Weaner",
+      "pricingBasis": "Per Head",
+      "unit": "Head",
+      "createdAt": {
+        "_seconds": 1771810613,
+        "_nanoseconds": 496000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810613,
+        "_nanoseconds": 496000000
+      }
+    }
+  },
+  {
+    "id": "kv5CscdcwtW62XXnkhLx",
+    "data": {
+      "type": "Fishing",
+      "commodity": "Aquaculture",
+      "saleMeth": "Culture",
+      "productForm": "Live weight",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 712000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 712000000
+      }
+    }
+  },
+  {
+    "id": "zK2QvAfkl3Kd038qUMKX",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Swine",
+      "saleMeth": "Service",
+      "productForm": "Stud",
+      "pricingBasis": "Per Service",
+      "unit": "Service",
+      "createdAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 813000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810816,
+        "_nanoseconds": 813000000
+      }
+    }
+  },
+  {
+    "id": "zaq7OphKzTraeCxjKZrk",
+    "data": {
+      "type": "Livestock",
+      "commodity": "Goat",
+      "saleMeth": "Live Animal",
+      "productForm": "Live weight",
+      "pricingBasis": "Per Kilogram",
+      "unit": "Kilograms",
+      "createdAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 478000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810817,
+        "_nanoseconds": 478000000
+      }
+    }
+  },
+  {
+    "id": "0rIvgkNeEhkrpLJiEp6w",
+    "data": {
+      "type": "Poultry",
+      "commodity": "Chicken",
+      "saleMeth": "By-product",
+      "productForm": "Table egg",
+      "pricingBasis": "Per Piece",
+      "unit": "Pieces",
+      "createdAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 140000000
+      },
+      "updatedAt": {
+        "_seconds": 1771810818,
+        "_nanoseconds": 140000000
+      }
+    }
+  }
+]
